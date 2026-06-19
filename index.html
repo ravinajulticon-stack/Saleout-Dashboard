@@ -1002,6 +1002,7 @@ function addWeekColumn(retailer, secName){
 
   // if overview is visible, refresh it too
   if(currentView === 'overview') renderAll();
+  debouncedSave();
 }
 
 function removeWeekColumn(retailer, secName, colIdx){
@@ -1033,8 +1034,21 @@ function removeWeekColumn(retailer, secName, colIdx){
 
   rebuildAllSectionTables();
   refreshDetailHeader();
-
   if(currentView === 'overview') renderAll();
+
+  // delete removed week from Supabase weekly_sales + update week_headers
+  (async()=>{
+    setSyncStatus('saving');
+    try {
+      await sb.from('weekly_sales').delete().eq('week_label', wkLabel);
+      await sb.from('week_headers').delete().eq('wk', wkLabel);
+      // re-save all week_headers with correct indices
+      const wkRows = WEEK_HEADERS.map((h,i) => ({ idx:i, wk:h.wk, date:h.date||'', day:h.day||'' }));
+      await sb.from('week_headers').upsert(wkRows);
+      setSyncStatus('saved');
+      setTimeout(()=>setSyncStatus(''),2000);
+    } catch(e){ setSyncStatus('error'); }
+  })();
 }
 
 function rebuildAllSectionTables(){
@@ -1089,7 +1103,7 @@ function rebuildSectionTable(retailer, secName){
 function updateColLabel(retailer, secName, colIdx, field, val){
   if(!val) return;
   const cols = getSecCols(retailer, secName);
-  if(cols[colIdx]) cols[colIdx][field] = val;
+  if(cols[colIdx]){ cols[colIdx][field] = val; debouncedSave(); }
 }
 
 function updateColDay(retailer, secName, colIdx){
@@ -1153,7 +1167,14 @@ function renderTbody(tbody, retailer, secName, secData, secColor){
     // del btn td
     const dtd=document.createElement('td'); dtd.style.cssText='text-align:center;padding:4px;border-right:none';
     const db=document.createElement('button'); db.className='btn-del-row'; db.textContent='✕'; db.title='Remove row';
-    db.onclick=()=>{ EDIT[retailer].sections[secName].products.splice(pIdx,1); recalcTotals(retailer,secName); refreshSection(retailer,secName); refreshDetailHeader(); };
+    db.onclick=()=>{
+  const pid = EDIT[retailer].sections[secName].products[pIdx]?.id;
+  EDIT[retailer].sections[secName].products.splice(pIdx,1);
+  recalcTotals(retailer,secName);
+  refreshSection(retailer,secName);
+  refreshDetailHeader();
+  if(pid)(async()=>{ await sb.from('products').delete().eq('id',pid); await sb.from('weekly_sales').delete().eq('product_id',pid); })();
+};
     dtd.appendChild(db); tr.appendChild(dtd);
     tbody.appendChild(tr);
   });
@@ -1236,25 +1257,39 @@ function refreshDetailHeader(){
 }
 
 function addProduct(retailer, secName){
-  EDIT[retailer].sections[secName].products.push({name:'New Product',total:0,weekly:new Array(26).fill(0)});
+  const p={name:'New Product',total:0,weekly:new Array(WEEK_HEADERS.length).fill(0),id:uid('p_')};
+  EDIT[retailer].sections[secName].products.push(p);
   refreshSection(retailer,secName);
+  debouncedSave();
 }
 function removeSection(retailer, secName){
   if(!confirm(`Remove "${secName}"?`))return;
+  const rId = retailer.toLowerCase().replace(/\s/g,'_');
+  const secId = rId+'__'+secName.toLowerCase().replace(/[^a-z0-9]/g,'_');
   delete EDIT[retailer].sections[secName];
   renderDetail();
+  (async()=>{
+    setSyncStatus('saving');
+    try {
+      await sb.from('sections').delete().eq('id', secId);
+      setSyncStatus('saved');
+      setTimeout(()=>setSyncStatus(''),2000);
+    } catch(e){ setSyncStatus('error'); }
+  })();
 }
 function addSection(retailer){
   const name=prompt('Section name:'); if(!name)return;
   if(EDIT[retailer].sections[name]){alert('Already exists');return;}
   EDIT[retailer].sections[name]={total:0,products:[]};
   renderDetail();
+  debouncedSave();
 }
 function addRetailerBlock(){
   const name=prompt('Retailer name:'); if(!name)return;
   if(EDIT[name]){alert('Already exists');return;}
-  EDIT[name]={total:0,weeks:[...WEEKS],weekly_totals:new Array(26).fill(0),sections:{}};
+  EDIT[name]={total:0,weeks:[...WEEKS],weekly_totals:new Array(WEEK_HEADERS.length).fill(0),sections:{}};
   renderDetail();
+  debouncedSave();
 }
 
 function renderRetailerBlock(container, retailer){
