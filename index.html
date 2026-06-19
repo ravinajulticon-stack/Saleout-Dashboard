@@ -1,0 +1,1309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Saleout — FY2026</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* macOS Ventura / Sonoma palette */
+  --bg:        #1c1c1e;
+  --surface-1: #2c2c2e;
+  --surface-2: #3a3a3c;
+  --surface-3: #48484a;
+  --border:    rgba(255,255,255,0.08);
+  --border-strong: rgba(255,255,255,0.14);
+  --text:      #f5f5f7;
+  --text-2:    #aeaeb2;
+  --text-3:    #6e6e73;
+  --blue:      #0a84ff;
+  --blue-light:#409cff;
+  --green:     #30d158;
+  --amber:     #ff9f0a;
+  --red:       #ff453a;
+  --purple:    #bf5af2;
+  --teal:      #5ac8fa;
+  --radius-sm: 8px;
+  --radius:    12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --blur:      blur(20px);
+  --shadow:    0 4px 24px rgba(0,0,0,0.4);
+  --shadow-lg: 0 8px 40px rgba(0,0,0,0.6);
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+/* ── TITLEBAR ── */
+.titlebar {
+  height: 52px;
+  background: rgba(28,28,30,0.85);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  gap: 16px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.traffic-lights { display: flex; gap: 8px; flex-shrink: 0; }
+.tl { width: 12px; height: 12px; border-radius: 50%; }
+.tl-red   { background: #ff5f57; }
+.tl-amber { background: #febc2e; }
+.tl-green { background: #28c840; }
+.titlebar-center {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+.titlebar-title { font-size: 13px; font-weight: 600; color: var(--text); letter-spacing: -0.2px; }
+.titlebar-sub   { font-size: 12px; color: var(--text-3); }
+
+/* ── TOOLBAR ── */
+.toolbar {
+  background: rgba(44,44,46,0.7);
+  backdrop-filter: var(--blur);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* macOS segmented control */
+.seg-ctrl {
+  display: flex;
+  background: var(--surface-1);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 2px;
+  gap: 1px;
+}
+.seg-btn {
+  padding: 5px 14px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.seg-btn.active {
+  background: var(--surface-3);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+}
+.seg-btn:hover:not(.active) { color: var(--text); background: rgba(255,255,255,0.05); }
+
+/* retailer pills */
+.pill-group { display: flex; gap: 5px; flex-wrap: wrap; }
+.pill {
+  padding: 5px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.pill:hover { border-color: var(--blue); color: var(--text); }
+.pill.active { background: var(--blue); border-color: var(--blue); color: #fff; font-weight: 600; }
+
+.toolbar-sep { width: 1px; height: 22px; background: var(--border-strong); flex-shrink: 0; }
+
+/* week range */
+.wk-range { display: flex; align-items: center; gap: 6px; }
+.wk-label { font-size: 11px; color: var(--text-3); font-weight: 500; }
+.wk-sel {
+  background: var(--surface-1);
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-family: inherit;
+  outline: none;
+  cursor: pointer;
+  appearance: none;
+  padding-right: 20px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%236e6e73'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+}
+
+/* ── MAIN LAYOUT ── */
+.main { padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+
+/* ── CARDS ── */
+.card {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: visible;
+}
+.card-header {
+  padding: 14px 18px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.card-title { font-size: 12px; font-weight: 600; color: var(--text-2); letter-spacing: 0.3px; text-transform: uppercase; }
+.card-body  { padding: 14px 18px 18px; }
+
+/* ── KPI STRIP ── */
+.kpi-strip { display: grid; grid-template-columns: repeat(6,1fr); gap: 1px; background: var(--border); border-radius: var(--radius-lg); overflow: hidden; border: 1px solid var(--border); }
+.kpi-item  { background: var(--surface-1); padding: 16px 18px; }
+.kpi-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text-3); margin-bottom: 6px; }
+.kpi-val   { font-size: 26px; font-weight: 700; letter-spacing: -1px; line-height: 1; color: var(--text); }
+.kpi-val.blue   { color: var(--blue); }
+.kpi-val.green  { color: var(--green); }
+.kpi-val.amber  { color: var(--amber); }
+.kpi-sub   { font-size: 10px; color: var(--text-3); margin-top: 5px; }
+@media(max-width:1000px){ .kpi-strip { grid-template-columns: repeat(3,1fr); } }
+@media(max-width:600px){ .kpi-strip { grid-template-columns: repeat(2,1fr); } }
+
+/* ── TWO COL ── */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media(max-width:900px){ .two-col { grid-template-columns: 1fr; } }
+.chart-wrap      { position: relative; height: 200px; }
+.chart-wrap-tall { position: relative; height: 260px; }
+
+/* ── SHARE BARS ── */
+.share-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--border); }
+.share-row:last-child { border-bottom: none; }
+.share-name { font-size: 12px; font-weight: 500; color: var(--text); width: 115px; flex-shrink: 0; }
+.share-track { flex: 1; height: 5px; background: var(--surface-2); border-radius: 3px; overflow: hidden; }
+.share-fill  { height: 100%; border-radius: 3px; transition: width 0.4s ease; }
+.share-num   { font-size: 12px; font-weight: 600; width: 48px; text-align: right; flex-shrink: 0; }
+
+/* ── SECTION PILLS ── */
+.filter-pills { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.fp {
+  padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 500;
+  border: 1px solid var(--border-strong); background: transparent; color: var(--text-3);
+  cursor: pointer; transition: all 0.12s; font-family: inherit;
+}
+.fp.active, .fp:hover { border-color: var(--blue); color: var(--blue-light); background: rgba(10,132,255,0.1); }
+
+/* ── PRODUCT TABLE ── */
+.ptable { width: 100%; border-collapse: collapse; }
+.ptable th { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-3); font-weight: 600; padding: 0 8px 8px 0; border-bottom: 1px solid var(--border); text-align: left; }
+.ptable th:last-child { text-align: right; }
+.ptable td { padding: 8px 8px 8px 0; border-bottom: 1px solid var(--border); font-size: 12px; vertical-align: middle; }
+.ptable tr:last-child td { border-bottom: none; }
+.ptable tr:hover td { background: rgba(255,255,255,0.03); }
+.pname { font-weight: 500; color: var(--text); font-size: 11px; }
+.pbar-wrap { width: 64px; height: 4px; background: var(--surface-2); border-radius: 2px; overflow: hidden; display: inline-block; vertical-align: middle; }
+.pbar-fill { height: 100%; border-radius: 2px; }
+.pnum { text-align: right; font-weight: 600; font-size: 13px; }
+
+/* ── CAT LEGEND ── */
+.cat-leg-item { display: flex; align-items: center; gap: 8px; font-size: 11px; padding: 3px 0; }
+.cat-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+
+/* ── SPARKLINES ── */
+.spark-grid { display: flex; flex-direction: row; flex-wrap: nowrap; gap: 8px; width: 100%; }
+.spark-card { background: var(--surface-2); border-radius: var(--radius); padding: 8px 10px; border: 1px solid var(--border); flex: 1 1 0%; min-width: 0; overflow: hidden; box-sizing: border-box; }
+.spark-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+.spark-name { font-size: 12px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.spark-total { font-size: 10px; color: var(--text-3); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.spark-peak { text-align: right; flex-shrink: 0; min-width: 0; }
+.spark-peak-val { font-size: 12px; font-weight: 700; white-space: nowrap; }
+.spark-peak-wk  { font-size: 9px; color: var(--text-3); white-space: nowrap; }
+.spark-canvas { position: relative; height: 48px; width: 100%; }
+
+/* ── DETAIL VIEW ── */
+#detailView { display: none; }
+
+.detail-top {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.detail-retailer { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; color: var(--text); }
+.detail-badge {
+  background: var(--blue);
+  border-radius: 10px;
+  padding: 6px 16px;
+  font-size: 20px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.5px;
+}
+
+/* section block */
+.sec-block {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;  /* keeps rounded corners */
+  min-width: 0;      /* allows flex/grid children to shrink */
+}
+.sec-hd {
+  background: rgba(28,28,30,0.6);
+  backdrop-filter: var(--blur);
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+  gap: 8px;
+}
+.sec-hd-name {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  outline: none;
+  border-bottom: 1px dashed transparent;
+  transition: border-color 0.15s;
+  padding-bottom: 1px;
+}
+.sec-hd-name:focus { border-bottom-color: var(--blue); }
+.sec-hd-right { display: flex; align-items: center; gap: 8px; }
+.sec-total { font-size: 14px; font-weight: 700; }
+.tbl-scroll {
+  overflow-x: auto;
+  overflow-y: visible;
+  scrollbar-width: thin;
+  scrollbar-color: var(--surface-3) var(--surface-2);
+  width: 100%;
+  max-width: 100%;
+  display: block;
+  box-sizing: border-box;
+  -webkit-overflow-scrolling: touch;
+}
+.tbl-scroll::-webkit-scrollbar { height: 7px; }
+.tbl-scroll::-webkit-scrollbar-track { background: var(--surface-2); border-radius: 4px; }
+.tbl-scroll::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 4px; } .tbl-scroll::-webkit-scrollbar-thumb:hover { background: var(--blue); }
+
+/* saleout table */
+.so-table {
+  width: max-content;
+  min-width: max-content;
+  border-collapse: collapse;
+  font-size: 11px;
+  white-space: nowrap;
+  table-layout: fixed;
+}
+.so-table thead th {
+  background: rgba(28,28,30,0.8);
+  color: var(--text-3);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 8px 10px;
+  text-align: center;
+  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+.so-table thead th.col-name {
+  text-align: left;
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  background: rgba(28,28,30,0.95);
+  min-width: 200px;
+  max-width: 200px;
+  width: 200px;
+}
+.so-table thead th.col-total { color: var(--blue-light); }
+.so-table thead th.col-del { min-width: 36px; border-right: none; }
+
+.so-table tbody td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  text-align: center;
+  color: var(--text);
+  transition: background 0.1s;
+}
+.so-table tbody td.col-name {
+  text-align: left;
+  font-weight: 500;
+  background: var(--surface-1);
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  white-space: normal;
+  word-break: break-word;
+  min-width: 200px;
+  max-width: 200px;
+  width: 200px;
+}
+.so-table tbody td.col-total { font-weight: 700; color: var(--blue-light); background: rgba(10,132,255,0.06); position: sticky; left: 200px; z-index: 1; }
+.so-table thead th.col-total { position: sticky; left: 200px; z-index: 3; background: rgba(28,28,30,0.95); }
+.so-table tbody tr:hover td { background: rgba(255,255,255,0.04) !important; }
+.so-table tbody tr:hover td.col-name { background: rgba(255,255,255,0.06) !important; }
+
+.cell-zero { color: var(--surface-3); }
+.cell-neg  { color: var(--red); font-weight: 600; }
+.cell-pos  { color: var(--text-2); }
+.cell-med  { background: rgba(48,209,88,0.08) !important; color: #30d158 !important; }
+.cell-high { background: rgba(48,209,88,0.18) !important; color: #4ddb72 !important; font-weight: 700; }
+
+.so-table tbody tr.wk-total-row td {
+  background: rgba(10,132,255,0.06) !important;
+  font-weight: 700;
+  color: var(--teal) !important;
+  border-top: 1px solid var(--border-strong);
+  font-size: 11px;
+}
+.so-table tbody tr.wk-total-row td.col-name {
+  background: rgba(10,132,255,0.08) !important;
+  color: var(--teal) !important;
+  font-style: italic;
+}
+.so-table tbody td[contenteditable] { cursor: text; }
+.so-table tbody td[contenteditable]:focus {
+  outline: none;
+  box-shadow: inset 0 0 0 1.5px var(--blue);
+  background: rgba(10,132,255,0.12) !important;
+  color: var(--text) !important;
+}
+.name-editable {
+  outline: none;
+  border-bottom: 1px dashed transparent;
+  transition: border-color 0.15s;
+  display: inline;
+  padding-bottom: 1px;
+}
+.name-editable:focus { border-bottom-color: var(--blue); }
+
+/* micro bar in name cell */
+.nano-bar { display: block; height: 2px; background: var(--surface-3); border-radius: 1px; overflow: hidden; margin-top: 4px; max-width: 100px; }
+.nano-fill { height: 100%; border-radius: 1px; }
+
+/* ic buttons */
+.ic-btn {
+  border: none; border-radius: 6px; cursor: pointer;
+  font-size: 11px; font-weight: 600; font-family: inherit;
+  padding: 4px 10px; transition: all 0.15s; line-height: 1.4;
+}
+.btn-add { background: rgba(10,132,255,0.15); color: var(--blue-light); }
+.btn-add:hover { background: var(--blue); color: #fff; }
+.btn-del { background: transparent; color: var(--text-3); padding: 3px 7px; font-size: 12px; }
+.btn-del:hover { background: rgba(255,69,58,0.15); color: var(--red); }
+.btn-del-row { background: transparent; color: var(--surface-3); border: none; padding: 2px 6px; font-size: 12px; cursor: pointer; border-radius: 4px; }
+.btn-del-row:hover { background: rgba(255,69,58,0.12); color: var(--red); }
+
+.sec-add-bar { padding: 8px 14px; border-top: 1px solid var(--border); background: rgba(255,255,255,0.02); }
+.bottom-bar  { margin-top: 4px; display: flex; gap: 10px; }
+
+/* retailer heading in All view */
+.ret-heading {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 18px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  margin-top: 8px;
+  gap: 10px;
+}
+.ret-heading-name { font-size: 17px; font-weight: 700; letter-spacing: -0.3px; }
+.ret-heading-right { display: flex; align-items: center; gap: 10px; }
+.ret-total-badge { border-radius: 8px; padding: 4px 14px; font-size: 14px; font-weight: 700; color: #fff; }
+
+/* scrollable product table */
+.prod-scroll { overflow-y: auto; max-height: 320px; }
+.prod-scroll::-webkit-scrollbar { width: 4px; }
+.prod-scroll::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<!-- TITLEBAR -->
+<div class="titlebar">
+  <div class="traffic-lights">
+    <div class="tl tl-red"></div>
+    <div class="tl tl-amber"></div>
+    <div class="tl tl-green"></div>
+  </div>
+  <div class="titlebar-center">
+    <span class="titlebar-title">Saleout Report</span>
+    <span class="titlebar-sub">— FY2026</span>
+  </div>
+  <div style="width:44px"></div><!-- balance traffic lights -->
+</div>
+
+<!-- TOOLBAR -->
+<div class="toolbar">
+  <!-- view toggle -->
+  <div class="seg-ctrl">
+    <button class="seg-btn active" onclick="switchView('overview',this)">Overview</button>
+    <button class="seg-btn" onclick="switchView('detail',this)">Detail Table</button>
+  </div>
+  <div class="toolbar-sep"></div>
+  <!-- retailer pills -->
+  <div class="pill-group" id="retailerTabs"></div>
+  <div class="toolbar-sep"></div>
+  <!-- week range (overview only) -->
+  <div class="wk-range" id="wkRangeCtrl">
+    <span class="wk-label">From</span>
+    <select class="wk-sel" id="wkFrom"></select>
+    <span class="wk-label">to</span>
+    <select class="wk-sel" id="wkTo"></select>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- ── OVERVIEW ── -->
+  <div id="overviewView">
+
+    <!-- KPI strip -->
+    <div class="kpi-strip" id="kpiStrip"></div>
+
+    <!-- Trend + Share -->
+    <div class="two-col">
+      <div class="card">
+        <div class="card-header"><span class="card-title" id="trendTitle">Weekly Sales</span></div>
+        <div class="card-body"><div class="chart-wrap-tall"><canvas id="trendChart"></canvas></div></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">Retailer Share</span></div>
+        <div class="card-body" id="shareBars"></div>
+      </div>
+    </div>
+
+    <!-- Products + Category -->
+    <div class="two-col">
+      <div class="card">
+        <div class="card-header"><span class="card-title" id="prodTitle">Top Products</span></div>
+        <div class="card-body">
+          <div class="filter-pills" id="sectionPills"></div>
+          <div class="prod-scroll">
+            <table class="ptable">
+              <thead><tr><th>Product</th><th>Category</th><th>Retailer</th><th></th><th style="text-align:right">Units</th></tr></thead>
+              <tbody id="prodTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title" id="catTitle">Category Mix</span></div>
+        <div class="card-body">
+          <div class="chart-wrap"><canvas id="catChart"></canvas></div>
+          <div id="catLegend" style="margin-top:14px;display:flex;flex-direction:column;gap:4px"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sparklines -->
+    <div class="card" style="width:100%">
+      <div class="card-header"><span class="card-title">Weekly Trend by Retailer</span></div>
+      <div class="card-body" style="padding:12px 14px"><div class="spark-grid" id="sparkGrid"></div></div>
+    </div>
+
+  </div>
+
+  <!-- ── DETAIL TABLE ── -->
+  <div id="detailView">
+    <div class="detail-top">
+      <div>
+        <div style="font-size:10px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:4px">Retailer</div>
+        <div class="detail-retailer" id="detailRetailerName">All Retailers</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:10px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:4px">Total Units</div>
+        <div class="detail-badge" id="detailTotalBadge">0</div>
+      </div>
+    </div>
+    <div id="detailSections" style="display:flex;flex-direction:column;gap:12px;margin-top:12px"></div>
+  </div>
+
+</div>
+
+<script>
+// ═══════════════════════════════════════
+//  SUPABASE CONFIG
+// ═══════════════════════════════════════
+const SUPABASE_URL = 'https://khdbaboyhuwzggliwksq.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtoZGJhYm95aHV3emdnbGl3a3NxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4MzcyNzcsImV4cCI6MjA5NzQxMzI3N30.Du99Sbm1W6l9BbcGlbm2lRKcCqNAx9LlHUGIMQNNGLc';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ── Sync status indicator ──
+function setSyncStatus(state){
+  const el = document.getElementById('syncStatus');
+  if(!el) return;
+  const states = {
+    saving: ['⏳', '#f59e0b', 'Saving...'],
+    saved:  ['✓',  '#30d158', 'Saved'],
+    error:  ['✗',  '#ff453a', 'Error'],
+    loading:['⏳', '#f59e0b', 'Loading...'],
+    loaded: ['✓',  '#30d158', 'Loaded'],
+  };
+  const [icon, color, text] = states[state] || ['', '', ''];
+  el.innerHTML = `<span style="color:${color}">${icon} ${text}</span>`;
+}
+
+// ── Generate a simple ID ──
+function uid(prefix=''){
+  return prefix + Math.random().toString(36).slice(2,10);
+}
+
+// ── Save everything to Supabase ──
+async function saveToSupabase(){
+  setSyncStatus('saving');
+  try {
+    // 1. Upsert retailers
+    const retailers = Object.keys(EDIT).map(name => ({
+      id: name.toLowerCase().replace(/\s/g,'_'),
+      name,
+      total: EDIT[name].total
+    }));
+    await sb.from('retailers').upsert(retailers);
+
+    // 2. Upsert week_headers
+    const wkRows = WEEK_HEADERS.map((h,i) => ({ idx:i, wk:h.wk, date:h.date||'', day:h.day||'' }));
+    await sb.from('week_headers').upsert(wkRows);
+
+    // 3. Upsert sections + products + weekly_sales
+    for(const [rName, rd] of Object.entries(EDIT)){
+      const rId = rName.toLowerCase().replace(/\s/g,'_');
+      for(const [secName, sec] of Object.entries(rd.sections)){
+        const secId = rId+'__'+secName.toLowerCase().replace(/[^a-z0-9]/g,'_');
+        await sb.from('sections').upsert({ id:secId, retailer_id:rId, name:secName, total:sec.total });
+        for(const p of sec.products){
+          if(!p.id) p.id = uid('p_');
+          await sb.from('products').upsert({ id:p.id, section_id:secId, retailer_id:rId, name:p.name, total:p.total });
+          const salesRows = p.weekly.map((qty,wi) => ({
+            id: p.id+'__'+wi,
+            product_id: p.id,
+            week_label: WEEK_HEADERS[wi]?.wk || 'WK'+(27+wi),
+            qty
+          }));
+          await sb.from('weekly_sales').upsert(salesRows);
+        }
+      }
+    }
+    setSyncStatus('saved');
+    setTimeout(()=>setSyncStatus(''), 2000);
+  } catch(e){
+    console.error('Save error:', e);
+    setSyncStatus('error');
+  }
+}
+
+// ── Load everything from Supabase ──
+async function loadFromSupabase(){
+  setSyncStatus('loading');
+  try {
+    const { data: retailers } = await sb.from('retailers').select('*');
+    if(!retailers || retailers.length === 0){
+      // No data yet — save the default RAW data
+      setSyncStatus('saving');
+      // assign IDs to all products first
+      Object.values(EDIT).forEach(rd => Object.values(rd.sections).forEach(sec => sec.products.forEach(p => { if(!p.id) p.id = uid('p_'); })));
+      await saveToSupabase();
+      setSyncStatus('loaded');
+      return;
+    }
+
+    const { data: sections }    = await sb.from('sections').select('*');
+    const { data: products }    = await sb.from('products').select('*');
+    const { data: weekly_sales} = await sb.from('weekly_sales').select('*');
+    const { data: wkHeaders }   = await sb.from('week_headers').select('*').order('idx');
+
+    // Rebuild WEEK_HEADERS
+    if(wkHeaders && wkHeaders.length > 0){
+      WEEK_HEADERS.length = 0;
+      wkHeaders.forEach(h => WEEK_HEADERS.push({ wk:h.wk, date:h.date, day:h.day }));
+      WEEKS.length = 0;
+      WEEK_HEADERS.forEach(h => WEEKS.push(h.wk));
+    }
+
+    // Rebuild EDIT
+    const newEdit = {};
+    retailers.forEach(r => {
+      newEdit[r.name] = { total: r.total, weekly_totals: new Array(WEEK_HEADERS.length).fill(0), weeks: [...WEEKS], sections: {} };
+    });
+
+    sections.forEach(sec => {
+      const r = retailers.find(r => r.id === sec.retailer_id);
+      if(!r) return;
+      newEdit[r.name].sections[sec.name] = { total: sec.total, products: [] };
+    });
+
+    const salesByProduct = {};
+    weekly_sales.forEach(ws => {
+      if(!salesByProduct[ws.product_id]) salesByProduct[ws.product_id] = {};
+      salesByProduct[ws.product_id][ws.week_label] = ws.qty;
+    });
+
+    products.forEach(p => {
+      const r = retailers.find(r => r.id === p.retailer_id);
+      const sec = sections.find(s => s.id === p.section_id);
+      if(!r || !sec) return;
+      const weekly = WEEK_HEADERS.map(h => salesByProduct[p.id]?.[h.wk] || 0);
+      newEdit[r.name].sections[sec.name].products.push({ id:p.id, name:p.name, total:p.total, weekly });
+    });
+
+    // Apply to EDIT
+    Object.keys(EDIT).forEach(k => delete EDIT[k]);
+    Object.assign(EDIT, newEdit);
+
+    // Refresh selects
+    refreshWeekSelects();
+    setSyncStatus('loaded');
+    setTimeout(()=>setSyncStatus(''), 2000);
+  } catch(e) {
+    console.error('Load error:', e);
+    setSyncStatus('error');
+  }
+}
+
+const RAW = {"Bunnings": {"total": 4954, "weeks": ["WK27", "WK28", "WK29", "WK30", "WK31", "WK32", "WK33", "WK34", "WK35", "WK36", "WK37", "WK38", "WK39", "WK40", "WK41", "WK42", "WK43", "WK44", "WK45", "WK46", "WK47", "WK48", "WK49", "WK50", "WK51", "WK52"], "weekly_totals": [156, 190, 202, 159, 250, 230, 219, 240, 202, 212, 215, 184, 160, 167, 185, 180, 193, 210, 286, 223, 214, 220, 229, 236, 0, 0], "sections": {"PHILIPS LOCKS SOLD": {"total": 4844, "products": [{"name": "709-7HWS", "total": 642, "weekly": [12, 26, 37, 33, 29, 36, 17, 19, 14, 36, 25, 17, 25, 16, 25, 23, 16, 26, 34, 26, 28, 26, 46, 50, 0, 0]}, {"name": "7300-5HWS", "total": 0, "weekly": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 15, 5, 12, 18, 15, 16, 17, 18, 17, 0, 0]}, {"name": "210S-1H", "total": 704, "weekly": [25, 34, 32, 22, 33, 33, 21, 23, 21, 23, 23, 25, 21, 31, 27, 34, 29, 27, 38, 48, 35, 37, 26, 36, 0, 0]}, {"name": "210S-12H", "total": 706, "weekly": [14, 7, 12, 7, 44, 43, 25, 37, 29, 26, 35, 28, 24, 36, 31, 39, 20, 35, 41, 32, 43, 32, 43, 23, 0, 0]}, {"name": "505-5HBS", "total": 433, "weekly": [10, 10, 11, 6, 18, 32, 21, 22, 14, 16, 21, 17, 23, 13, 36, 20, 16, 10, 22, 14, 18, 12, 32, 19, 0, 0]}, {"name": "720-MVP", "total": 42, "weekly": [1, 2, 2, 3, 1, 3, 1, 1, 1, 0, 1, 2, 2, 0, 3, 0, 3, 2, 0, 5, 3, 1, 2, 3, 0, 0]}, {"name": "250X-14", "total": 137, "weekly": [6, 6, 1, 5, 7, 8, 5, 7, 6, 7, 9, 5, 1, 4, 8, 5, 3, 5, 6, 7, 5, 5, 7, 9, 0, 0]}, {"name": "615-5HB", "total": 1196, "weekly": [47, 55, 54, 39, 73, 43, 41, 42, 49, 33, 23, 32, 29, 17, 21, 34, 79, 81, 94, 61, 54, 67, 52, 76, 0, 0]}, {"name": "610-5HBS", "total": 46, "weekly": [0, 3, 1, 1, 1, 1, 0, 1, 0, 4, 4, 2, 2, 3, 2, 2, 5, 2, 3, 1, 1, 3, 3, 1, 0, 0]}, {"name": "608-5HWS", "total": 84, "weekly": [1, 1, 3, 2, 4, 4, 4, -1, 4, 5, 1, 9, 1, 11, 4, 0, 6, 3, 10, 8, 3, 4, -2, -1, 0, 0]}]}, "PHILIPS SAFES SOLD": {"total": 86, "products": [{"name": "SBX202-5C0", "total": 25, "weekly": [0, 0, 2, 0, 0, 1, 1, 4, 0, 1, 0, 1, 0, 3, 1, 0, 0, 1, 3, 2, 2, 2, 0, 1, 0, 0]}, {"name": "SBX202-6C0", "total": 21, "weekly": [1, 1, 0, 3, 2, 0, 2, 0, 0, 0, 0, 1, 0, 0, 2, 1, 0, 1, 2, 2, 1, 2, 0, 0, 0, 0]}, {"name": "SBX202-7C0", "total": 19, "weekly": [1, 2, 0, 0, 0, 2, 0, 1, 1, 0, 1, 2, 0, 0, 0, 0, 0, 1, 4, 0, 0, 1, 2, 1, 0, 0]}, {"name": "SBX301-5PC", "total": 5, "weekly": [0, 2, 2, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}, {"name": "SBX001-1M4", "total": 1, "weekly": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}, {"name": "SBX-602-8CU", "total": 7, "weekly": [0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 2, 1, 0, 0, 0, 0, 0, 0]}, {"name": "SBX-602-6CU", "total": 8, "weekly": [1, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 1, 1, 0, 0]}]}, "DDL LOCKS SOLD": {"total": 24, "products": [{"name": "SHP-R80", "total": 24, "weekly": [0, 1, 0, 0, 2, 0, 0, 1, 0, 0, 2, 4, 2, 2, 0, 1, 0, 1, 2, 0, 3, 4, -1, 0, 0, 0]}]}}}, "Bing Lee": {"total": 398, "weeks": ["WK27", "WK28", "WK29", "WK30", "WK31", "WK32", "WK33", "WK34", "WK35", "WK36", "WK37", "WK38", "WK39", "WK40", "WK41", "WK42", "WK43", "WK44", "WK45", "WK46", "WK47", "WK48", "WK49", "WK50", "WK51", "WK52"], "weekly_totals": [8, 6, 15, 9, 20, 27, 27, 32, 47, 33, 33, 33, 28, 17, 17, 18, 16, 22, 33, 11, 25, 19, 8, 35, 0, 0], "sections": {"PHILIPS LOCKS SOLD": {"total": 294, "products": [{"name": "709-7HWS", "total": 224, "weekly": [0, 3, 5, 6, 9, 14, 12, 19, 32, 16, 13, 10, 9, 1, 6, 5, 5, 10, 15, 7, 10, 5, 5, 7, 0, 0]}, {"name": "270X-2TXS3", "total": 10, "weekly": [0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 1, 0, 2, 0, 0, 2, 1, 0, 1, 0, 0]}, {"name": "DDL250X-14HWC", "total": 8, "weekly": [0, 0, 0, 0, 1, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 2, 0, 0, 0, 0]}, {"name": "720-MVP-17HWS", "total": 37, "weekly": [2, 0, 1, 1, 1, 3, -1, 1, 2, 3, 2, 1, 2, 1, 4, 3, 2, 1, 1, 2, 1, 2, 0, 2, 0, 0]}, {"name": "DDL902-MFVP", "total": 15, "weekly": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 0, 0, 0, 0, 2, 0, 1, 4, 1, 4, 0, 0]}]}, "DDL & ZIG LOCKS SOLD": {"total": 90, "products": [{"name": "SHP-R80FCLP/ZE", "total": 90, "weekly": [0, 1, 1, 0, 3, 2, 9, 4, 4, 5, 0, 4, 2, 5, 1, 6, 3, 5, 4, 2, 3, 5, 2, 19, 0, 0]}]}, "PHILIPS SAFES SOLD": {"total": 14, "products": [{"name": "SBX202-7CO-GOLD", "total": 3, "weekly": [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0]}, {"name": "SBX202-7CO-GREY", "total": 2, "weekly": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0]}, {"name": "SBX202-6CU-GOLD", "total": 4, "weekly": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 1, 0, 0]}, {"name": "SBX202-6CU-GREY", "total": 1, "weekly": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0]}, {"name": "SBX202-5CO-GREY", "total": 2, "weekly": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0]}, {"name": "SBX202-5CO-GOLD", "total": 2, "weekly": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0]}]}}}, "Harvey Norman": {"total": 463, "weeks": ["WK27", "WK28", "WK29", "WK30", "WK31", "WK32", "WK33", "WK34", "WK35", "WK36", "WK37", "WK38", "WK39", "WK40", "WK41", "WK42", "WK43", "WK44", "WK45", "WK46", "WK47", "WK48", "WK49", "WK50", "WK51", "WK52"], "weekly_totals": [11, 11, 7, 21, 19, 12, 14, 14, 46, 36, 20, 11, 20, 15, 28, 15, 12, 31, 5, 17, 42, 24, 20, 11, 0, 0], "sections": {"PHILIPS LOCKS SOLD": {"total": 463, "products": [{"name": "709-7HWS", "total": 140, "weekly": [2, 5, 1, 10, 6, 6, 11, -1, 6, 7, 9, 6, 8, 5, 11, 5, 3, 8, 2, 6, 10, 4, 8, 2, 0, 0]}, {"name": "7300-5HB", "total": 200, "weekly": [2, 1, 0, 4, 3, 5, 1, 12, 39, 25, 4, 1, 6, 9, 7, 7, 5, 15, 2, 10, 24, 5, 7, 6, 0, 0]}, {"name": "210S-1H", "total": 57, "weekly": [2, 1, 2, 5, 6, 1, 1, 2, 1, 1, 2, 5, 5, 1, 2, 1, 2, 3, 1, 1, 2, 7, 2, 1, 0, 0]}, {"name": "608-5HWS", "total": 55, "weekly": [4, 4, 2, 1, 4, 0, 1, 1, 1, 1, 2, 0, 1, 0, 7, 2, 2, 5, 0, 0, 6, 7, 3, 1, 0, 0]}, {"name": "Alpha-VP-5HWS", "total": 11, "weekly": [1, 0, 2, 1, 0, 0, 0, 0, -1, 2, 3, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0]}]}, "PHILIPS SAFES SOLD": {"total": 0, "products": []}}}, "Website": {"total": 1537, "weeks": ["WK27", "WK28", "WK29", "WK30", "WK31", "WK32", "WK33", "WK34", "WK35", "WK36", "WK37", "WK38", "WK39", "WK40", "WK41", "WK42", "WK43", "WK44", "WK45", "WK46", "WK47", "WK48", "WK49", "WK50", "WK51", "WK52"], "weekly_totals": [113, 47, 37, 25, 45, 60, 189, 172, 109, 110, 103, 61, 37, 31, 32, 108, 89, 23, 12, 41, 17, 41, 28, 34, 0, 0], "sections": {"PHILIPS LOCKS SOLD": {"total": 1222, "products": [{"name": "303-VP-5HWS", "total": 128, "weekly": [23, 5, 4, 6, 15, 16, 16, 12, 15, 18, 0, -1, 0, 0, 2, 0, -2, 0, -1, 0, 0, 0, 0, 0, 0, 0]}, {"name": "709-FVP-7HWS", "total": 180, "weekly": [1, 2, 0, 0, 1, 0, 77, 50, 7, 3, 0, 3, 0, 1, 2, 7, 1, 4, 1, 1, 1, 4, 6, 8, 0, 0]}, {"name": "603E-5HWS", "total": 100, "weekly": [23, 5, 15, 3, 2, 7, 4, 1, 2, 3, 16, 4, 10, -1, 2, 3, 1, -1, -2, 1, 1, 1, 0, 0, 0, 0]}, {"name": "Alpha-VP-5HWS", "total": -1, "weekly": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}, {"name": "702-8HWS", "total": 54, "weekly": [18, 0, -1, 0, -1, 0, 1, 3, 6, 4, 3, 2, 3, 0, 2, 6, 6, 5, -1, -1, 0, 0, -1, 0, 0, 0]}, {"name": "608-5HWS", "total": 76, "weekly": [0, 2, 0, 2, 1, 1, 8, 13, 9, 7, 14, 2, 8, 8, 0, 1, 0, -2, 0, 1, -2, 0, 0, 3, 0, 0]}, {"name": "610-5HBS", "total": 10, "weekly": [0, 0, 0, 1, 0, 0, 2, 2, -1, 0, 0, 1, 0, 0, 0, 0, 3, 0, 0, 0, 0, 1, 0, 1, 0, 0]}, {"name": "611-5HBS", "total": 4, "weekly": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0]}, {"name": "615-5HBS", "total": 59, "weekly": [0, 1, 1, 0, 2, 1, 3, 0, 1, 2, 7, 2, -3, 1, 6, 13, 9, -1, 5, 1, 1, 6, 1, 0, 0, 0]}, {"name": "7300-5HB", "total": 116, "weekly": [0, 2, 2, 2, 0, 3, 26, 8, 5, 17, 26, 0, 2, 1, 4, 6, 1, -2, 1, 3, 2, 4, -1, 4, 0, 0]}, {"name": "7300-5HWS", "total": 30, "weekly": [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 20, 2, 0, 1, 3, 0, 1, 1, 0, 1, 0, 0, 0, 0, 0]}, {"name": "720-MVP-17HWS", "total": 47, "weekly": [0, 0, 0, 2, 2, 1, -1, 1, 5, 5, 2, 5, 3, 2, 0, 3, 1, 4, 3, 3, 1, 2, 2, 1, 0, 0]}, {"name": "502-13HBS", "total": 16, "weekly": [1, 1, 0, 1, 1, 4, 3, 3, 2, 0, 1, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0]}, {"name": "505-5HBS", "total": 28, "weekly": [0, 0, 3, 1, 3, 3, 1, 6, 3, 6, -1, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}, {"name": "230x-1HWP", "total": 36, "weekly": [0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, -1, 1, 0, 0, 16, 13, 0, 2, 1, 0, 2, 0, 0, 0, 0]}, {"name": "250X-14HWC", "total": 8, "weekly": [0, 0, 0, 0, 3, 0, 0, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0]}, {"name": "270X-2TXS3", "total": 97, "weekly": [0, 0, 0, 1, 0, 1, 6, 3, 3, 3, 2, 0, 0, 0, 0, 38, 40, 0, -2, 0, 0, 2, 0, 0, 0, 0]}, {"name": "801-5HBS", "total": 56, "weekly": [0, 0, 0, 0, 0, 1, 1, 9, 8, 1, 20, 4, 2, 5, 0, 0, 1, 0, 0, -1, 0, 2, 2, 1, 0, 0]}, {"name": "902-MFVP-11HWS", "total": 71, "weekly": [0, 1, 3, -1, 1, 2, 5, 3, 0, 5, 3, 0, 3, 0, 2, 5, 8, 5, 3, 6, 6, 4, 5, 2, 0, 0]}, {"name": "101-3HBS", "total": 66, "weekly": [0, 0, 0, 0, 0, 0, 13, 24, 9, 16, 1, 5, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}, {"name": "210S-12H", "total": 16, "weekly": [0, 0, 0, 0, 1, 1, 2, 4, 0, 3, 0, 1, 1, 0, 2, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0]}, {"name": "210S-1H", "total": 25, "weekly": [0, 0, 0, 2, 1, 3, 2, 1, 3, 3, -1, 2, 1, 1, 1, 1, 3, -1, 0, 0, 1, 1, 0, 1, 0, 0]}]}, "DDL LOCKS SOLD": {"total": 10, "products": [{"name": "DDL-SH5000B", "total": 3, "weekly": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 1, 0, 0, 0]}, {"name": "DDL-R7000B", "total": 2, "weekly": [0, 0, 0, 0, -1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0]}, {"name": "DDL-P6006S", "total": 5, "weekly": [0, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}]}, "ZIGBANG LOCKS SOLD": {"total": 140, "products": [{"name": "SHP-P52", "total": 3, "weekly": [1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0]}, {"name": "SHP-DP-609", "total": 32, "weekly": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 2, 0, 3, 3, 7, 8, 7, 0, 0]}, {"name": "SHP-R80", "total": 69, "weekly": [2, 7, 4, 9, 2, 7, 1, 6, 2, 3, 2, 2, 3, 6, 1, 0, 0, 3, 0, 1, 2, 1, 2, 3, 0, 0]}, {"name": "SHP-H60F", "total": 27, "weekly": [0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 3, 2, 19, 0, 1, 0, 0, 0, 0]}, {"name": "SHP-H60R", "total": 1, "weekly": [-1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0]}, {"name": "ZD-R70", "total": 7, "weekly": [2, 0, 0, 0, 0, 0, 0, 0, 2, 2, 0, 2, 0, 0, 0, 0, 1, 0, -2, -1, 0, 0, 0, 1, 0, 0]}, {"name": "ZD-P73", "total": 1, "weekly": [0, 0, 0, -1, 0, 1, 0, 0, 0, 0, -1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}]}, "PHILIPS SAFES SOLD": {"total": 165, "products": [{"name": "SBX602-8CU", "total": 16, "weekly": [4, 1, 0, 0, 2, 0, 1, 1, 1, 0, 2, 0, 0, 1, 1, -1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0]}, {"name": "SBX602-6CU", "total": 23, "weekly": [3, 1, 0, 0, 1, 4, 1, 2, 1, 0, 3, 2, 1, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0]}, {"name": "SBX202-5C0", "total": 16, "weekly": [3, 1, 1, 0, 1, -2, 5, 2, 1, 0, 1, 0, 1, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}, {"name": "SBX202-6C0", "total": 22, "weekly": [2, 1, 1, 0, 1, 0, 1, 1, 2, 2, 0, 4, 1, 0, 2, 2, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0]}, {"name": "SBX202-7C0", "total": 17, "weekly": [2, 2, 0, 0, 2, 2, 2, 1, 4, 1, 1, -1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}, {"name": "SBX301-5PC", "total": 17, "weekly": [2, 0, 1, 0, 0, 1, 1, 5, 4, 1, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}, {"name": "SBX102-2C0", "total": 26, "weekly": [18, 0, 0, -1, 0, 0, 0, 4, 2, 2, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}, {"name": "SBX001-1M4", "total": 27, "weekly": [8, 0, 0, 0, 4, 1, 1, 4, 3, 1, 0, 1, 0, 2, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}, {"name": "SBX701-6B0", "total": 1, "weekly": [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}]}}}, "JB Hi-Fi": {"total": 17, "weeks": ["WK27", "WK28", "WK29", "WK30", "WK31", "WK32", "WK33", "WK34", "WK35", "WK36", "WK37", "WK38", "WK39", "WK40", "WK41", "WK42", "WK43", "WK44", "WK45", "WK46", "WK47", "WK48", "WK49", "WK50", "WK51", "WK52"], "weekly_totals": [1, 3, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 1, 0, 1, 1, 0, 6, 0, 0], "sections": {"PHILIPS LOCKS SOLD": {"total": 4, "products": [{"name": "DDA270X-2TXS3", "total": 4, "weekly": [0, 3, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}]}, "ZIGBANG LOCKS SOLD": {"total": 13, "products": [{"name": "SHP-R80", "total": 7, "weekly": [1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 1, 0, 1, 1, 0, 0, 0, 0]}, {"name": "SHP-DP609", "total": 5, "weekly": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0]}, {"name": "SHP-H60FBXS", "total": 1, "weekly": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0]}]}, "PHILIPS SAFES SOLD": {"total": 0, "products": []}}}, "Amazon": {"total": 135, "weeks": ["WK27", "WK28", "WK29", "WK30", "WK31", "WK32", "WK33", "WK34", "WK35", "WK36", "WK37", "WK38", "WK39", "WK40", "WK41", "WK42", "WK43", "WK44", "WK45", "WK46", "WK47", "WK48", "WK49", "WK50", "WK51", "WK52"], "weekly_totals": [26, 1, 4, 3, 0, 4, 6, 21, 42, 19, 1, -1, 4, -2, 6, -2, 1, 2, 2, -2, 0, 0, 0, 0, 0, 0], "sections": {"PHILIPS LOCKS SOLD": {"total": 126, "products": [{"name": "DDL603E-5HWS", "total": 58, "weekly": [17, -1, -2, -1, -1, 0, 5, 17, 21, 7, 0, -2, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}, {"name": "DDL608-5HWS - COPPER", "total": 27, "weekly": [3, 1, 2, 0, 2, 1, 0, 1, 9, 2, -1, 0, 5, 0, 3, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0]}, {"name": "B0D3FZT2LF - DDL608-5HWS - BLACK", "total": 2, "weekly": [0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}, {"name": "B0CW97QCYF - DDA270X-2TXS3", "total": 1, "weekly": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}, {"name": "DDL210S-1H", "total": 7, "weekly": [1, 0, 0, 2, 0, 1, -1, 2, 1, 0, 0, 1, 0, 0, 0, -1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0]}, {"name": "DDL210S-13H", "total": 2, "weekly": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}, {"name": "B0D3GB9CH2 - DDL303-VP-5HWS", "total": 1, "weekly": [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}, {"name": "B0CQPGLSBR - DDL709-FVP-7HWS - BLACK", "total": 4, "weekly": [1, 0, 1, 0, -1, 0, 0, 0, 0, 2, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}, {"name": "B0D3GBXGN8 - DDL709-FVP-7HWS - COPPER", "total": 0, "weekly": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, -1, -1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0]}, {"name": "7300-5HB", "total": 24, "weekly": [0, -1, 1, 1, 0, 0, 0, 1, 11, 8, 1, -2, -1, -1, 4, 0, 1, 2, 0, -1, 0, 0, 0, 0, 0, 0]}]}, "ZIGBANG LOCKS SOLD": {"total": 8, "products": [{"name": "SHP-H60F", "total": 8, "weekly": [2, 2, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}]}, "PHILIPS SAFES SOLD": {"total": 1, "products": [{"name": "B0DLMXBFLT - SBX202-5C0 GREY", "total": 1, "weekly": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}]}}}};
+
+let WEEKS=["WK27","WK28","WK29","WK30","WK31","WK32","WK33","WK34","WK35","WK36","WK37","WK38","WK39","WK40","WK41","WK42","WK43","WK44","WK45","WK46","WK47","WK48","WK49","WK50","WK51","WK52"];
+let WEEK_HEADERS=[{"wk":"WK27","date":"4-Jan","day":"Sun"},{"wk":"WK28","date":"11-Jan","day":"Sun"},{"wk":"WK29","date":"18-Jan","day":"Sun"},{"wk":"WK30","date":"25-Jan","day":"Sun"},{"wk":"WK31","date":"1-Feb","day":"Sun"},{"wk":"WK32","date":"8-Feb","day":"Sun"},{"wk":"WK33","date":"15-Feb","day":"Sun"},{"wk":"WK34","date":"22-Feb","day":"Sun"},{"wk":"WK35","date":"1-Mar","day":"Sun"},{"wk":"WK36","date":"8-Mar","day":"Sun"},{"wk":"WK37","date":"15-Mar","day":"Sun"},{"wk":"WK38","date":"22-Mar","day":"Sun"},{"wk":"WK39","date":"29-Mar","day":"Sun"},{"wk":"WK40","date":"5-Apr","day":"Sun"},{"wk":"WK41","date":"12-Apr","day":"Sun"},{"wk":"WK42","date":"19-Apr","day":"Sun"},{"wk":"WK43","date":"26-Apr","day":"Sun"},{"wk":"WK44","date":"3-May","day":"Sun"},{"wk":"WK45","date":"10-May","day":"Sun"},{"wk":"WK46","date":"17-May","day":"Sun"},{"wk":"WK47","date":"24-May","day":"Sun"},{"wk":"WK48","date":"31-May","day":"Sun"},{"wk":"WK49","date":"7-Jun","day":"Sun"},{"wk":"WK50","date":"14-Jun","day":"Sun"},{"wk":"WK51","date":"21-Jun","day":"Sun"},{"wk":"WK52","date":"28-Jun","day":"Sun"}];
+const RETAILERS=Object.keys(RAW);
+const COLORS=['#0a84ff','#30d158','#ff9f0a','#ff453a','#bf5af2','#5ac8fa'];
+const SEC_COLORS={'PHILIPS LOCKS SOLD':'#0a84ff','SAMSUNG LOCKS SOLD':'#ff453a','DDL LOCKS SOLD':'#ff9f0a','DDL & ZIG LOCKS SOLD':'#ff9f0a','ZIGBANG LOCKS SOLD':'#bf5af2','PHILIPS SAFES SOLD':'#30d158'};
+
+let EDIT=JSON.parse(JSON.stringify(RAW));
+let activeRetailer='All', activeSection='ALL', wkFrom=0, wkTo=23, currentView='overview';
+
+/* ── helpers ── */
+function getRetailers(){return activeRetailer==='All'?RETAILERS:[activeRetailer];}
+function getWeekSlice(arr){return arr.slice(wkFrom,wkTo+1);}
+function getWeekLabels(){return WEEKS.slice(wkFrom,wkTo+1);}
+
+function getWeeklyTotals(retailer){
+  if(!EDIT[retailer])return new Array(26).fill(0);
+  const t=new Array(26).fill(0);
+  Object.values(EDIT[retailer].sections).forEach(sec=>sec.products.forEach(p=>p.weekly.forEach((v,i)=>t[i]+=(v||0))));
+  return t;
+}
+function getCombinedWeekly(){const c=new Array(26).fill(0);getRetailers().forEach(r=>getWeeklyTotals(r).forEach((v,i)=>c[i]+=v));return c;}
+
+function getAllProducts(){
+  const out=[];
+  getRetailers().forEach(r=>{
+    Object.entries(EDIT[r]?EDIT[r].sections:{}).forEach(([sec,sd])=>{
+      if(activeSection!=='ALL'&&sec!==activeSection)return;
+      sd.products.forEach(p=>{if(p.total>0)out.push({...p,retailer:r,section:sec});});
+    });
+  });
+  return out.sort((a,b)=>b.total-a.total);
+}
+function getCatTotals(){
+  const cats={};
+  getRetailers().forEach(r=>Object.entries(EDIT[r]?EDIT[r].sections:{}).forEach(([sec,sd])=>{
+    const t=sd.products.filter(p=>p.total>0).reduce((s,p)=>s+p.total,0);
+    if(t>0)cats[sec]=(cats[sec]||0)+t;
+  }));
+  return cats;
+}
+function getSections(){const s=new Set();getRetailers().forEach(r=>Object.keys(EDIT[r]?EDIT[r].sections:{}).forEach(k=>s.add(k)));return Array.from(s);}
+
+/* ── week selects ── */
+const selFrom=document.getElementById('wkFrom'),selTo=document.getElementById('wkTo');
+
+function refreshWeekSelects(){
+  // remember current selections by label
+  const fromLabel = WEEKS[wkFrom];
+  const toLabel   = WEEKS[wkTo];
+  selFrom.innerHTML = '';
+  selTo.innerHTML   = '';
+  WEEKS.forEach((w,i)=>{ selFrom.add(new Option(w,i)); selTo.add(new Option(w,i)); });
+  // restore selection — default to last week for "to" if a new one was added
+  const newFromIdx = WEEKS.indexOf(fromLabel);
+  const newToIdx   = WEEKS.indexOf(toLabel);
+  wkFrom = newFromIdx !== -1 ? newFromIdx : 0;
+  wkTo   = newToIdx   !== -1 ? newToIdx   : WEEKS.length - 1;
+  selFrom.value = wkFrom;
+  selTo.value   = wkTo;
+}
+
+refreshWeekSelects();
+selFrom.addEventListener('change',()=>{wkFrom=+selFrom.value;renderAll();});
+selTo.addEventListener('change',()=>{wkTo=+selTo.value;renderAll();});
+
+/* ── retailer tabs ── */
+const tabsEl=document.getElementById('retailerTabs');
+['All',...RETAILERS].forEach(r=>{
+  const b=document.createElement('button');
+  b.className='pill'+(r==='All'?' active':'');
+  b.textContent=r;
+  b.onclick=()=>{activeRetailer=r;document.querySelectorAll('.pill').forEach(t=>t.classList.remove('active'));b.classList.add('active');renderAll();};
+  tabsEl.appendChild(b);
+});
+
+/* ── view toggle ── */
+function switchView(v,btn){
+  currentView=v;
+  document.querySelectorAll('.seg-btn').forEach(t=>t.classList.remove('active'));btn.classList.add('active');
+  document.getElementById('overviewView').style.display=v==='overview'?'block':'none';
+  document.getElementById('detailView').style.display=v==='detail'?'block':'none';
+  document.getElementById('wkRangeCtrl').style.display=v==='overview'?'flex':'none';
+  renderAll();
+}
+
+/* ── KPIs ── */
+function renderKpis(){
+  const rets=getRetailers();
+  const grand=rets.reduce((s,r)=>s+(EDIT[r]?EDIT[r].total:0),0);
+  const wkSlice=getCombinedWeekly().slice(wkFrom,wkTo+1).filter(v=>v>0);
+  const avg=wkSlice.length?Math.round(wkSlice.reduce((a,b)=>a+b,0)/wkSlice.length):0;
+  const peak=Math.max(...wkSlice,0);
+  const peakWk=WEEKS[wkFrom+wkSlice.indexOf(peak)]||'';
+  let plocks=0,psafes=0,other=0;
+  rets.forEach(r=>Object.entries(EDIT[r]?EDIT[r].sections:{}).forEach(([sec,sd])=>{
+    const t=sd.products.filter(p=>p.total>0).reduce((s,p)=>s+p.total,0);
+    if(sec.includes('PHILIPS LOCKS'))plocks+=t;
+    else if(sec.includes('SAFES'))psafes+=t;
+    else other+=t;
+  }));
+  document.getElementById('kpiStrip').innerHTML=`
+    <div class="kpi-item"><div class="kpi-label">Total Units</div><div class="kpi-val blue">${grand.toLocaleString()}</div><div class="kpi-sub">${activeRetailer==='All'?'6 retailers':activeRetailer}</div></div>
+    <div class="kpi-item"><div class="kpi-label">Avg Weekly</div><div class="kpi-val">${avg.toLocaleString()}</div><div class="kpi-sub">active weeks</div></div>
+    <div class="kpi-item"><div class="kpi-label">Peak Week</div><div class="kpi-val green">${peak.toLocaleString()}</div><div class="kpi-sub">${peakWk}</div></div>
+    <div class="kpi-item"><div class="kpi-label">Philips Locks</div><div class="kpi-val">${plocks.toLocaleString()}</div><div class="kpi-sub">${grand>0?Math.round(plocks/grand*100):0}% of total</div></div>
+    <div class="kpi-item"><div class="kpi-label">Philips Safes</div><div class="kpi-val">${psafes.toLocaleString()}</div><div class="kpi-sub">safe range</div></div>
+    <div class="kpi-item"><div class="kpi-label">DDL / Zigbang</div><div class="kpi-val amber">${other.toLocaleString()}</div><div class="kpi-sub">multi-brand</div></div>`;
+}
+
+/* ── trend chart ── */
+let trendChart;
+function renderTrend(){
+  document.getElementById('trendTitle').textContent=`Weekly Sales — ${activeRetailer}`;
+  const labels=getWeekLabels();
+  const ctx=document.getElementById('trendChart').getContext('2d');
+  if(trendChart)trendChart.destroy();
+  const chartDefaults={responsive:true,maintainAspectRatio:false,plugins:{legend:{display:activeRetailer==='All',labels:{color:'#6e6e73',font:{size:11,family:'Inter'},boxWidth:10,padding:12}},tooltip:{backgroundColor:'rgba(44,44,46,0.95)',titleColor:'#f5f5f7',bodyColor:'#aeaeb2',borderColor:'rgba(255,255,255,0.1)',borderWidth:1,cornerRadius:8,padding:10}},scales:{x:{ticks:{color:'#6e6e73',font:{size:10}},grid:{color:'rgba(255,255,255,0.05)'}},y:{ticks:{color:'#6e6e73',font:{size:10}},grid:{color:'rgba(255,255,255,0.05)'}}}};
+  const datasets=activeRetailer==='All'
+    ?RETAILERS.map((r,i)=>({label:r,data:getWeekSlice(getWeeklyTotals(r)),borderColor:COLORS[i],backgroundColor:COLORS[i]+'18',borderWidth:1.5,pointRadius:2,tension:0.4,fill:false}))
+    :[{label:activeRetailer,data:getWeekSlice(getWeeklyTotals(activeRetailer)),borderColor:'#0a84ff',backgroundColor:'rgba(10,132,255,0.1)',borderWidth:2,pointRadius:3,tension:0.4,fill:true}];
+  trendChart=new Chart(ctx,{type:'line',data:{labels,datasets},options:chartDefaults});
+}
+
+/* ── share ── */
+function renderShare(){
+  const grand=RETAILERS.reduce((s,r)=>s+(EDIT[r]?EDIT[r].total:0),0);
+  document.getElementById('shareBars').innerHTML=RETAILERS.map((r,i)=>{
+    const tot=EDIT[r]?EDIT[r].total:0;
+    const pct=grand>0?Math.round(tot/grand*100):0;
+    return `<div class="share-row"><div class="share-name">${r}</div><div class="share-track"><div class="share-fill" style="width:${pct}%;background:${COLORS[i]}"></div></div><div class="share-num" style="color:${COLORS[i]}">${tot.toLocaleString()}</div></div>`;
+  }).join('');
+}
+
+/* ── section pills ── */
+function renderPills(){
+  const secs=getSections();
+  document.getElementById('sectionPills').innerHTML=['ALL',...secs].map(s=>{
+    const label=s==='ALL'?'All':s.replace(' SOLD','');
+    return `<button class="fp ${activeSection===s?'active':''}" onclick="setSection('${s}')">${label}</button>`;
+  }).join('');
+}
+function setSection(s){activeSection=s;renderAll();}
+
+/* ── products table ── */
+function renderProducts(){
+  document.getElementById('prodTitle').textContent=`Top Products — ${activeRetailer}`;
+  const prods=getAllProducts().slice(0,20);
+  const max=prods[0]?.total||1;
+  document.getElementById('prodTableBody').innerHTML=prods.map(p=>{
+    const pct=Math.round(p.total/max*100);
+    const c=SEC_COLORS[p.section]||'#6e6e73';
+    const cat=p.section.replace(' SOLD','').replace('PHILIPS ','').replace('SAMSUNG ','').replace('DDL & ZIG ','DDL/Zig ');
+    return `<tr>
+      <td><span class="pname">${p.name}</span></td>
+      <td><span style="font-size:10px;font-weight:600;color:${c}">${cat}</span></td>
+      <td><span style="font-size:10px;color:var(--text-3)">${p.retailer}</span></td>
+      <td><div class="pbar-wrap"><div class="pbar-fill" style="width:${pct}%;background:${c}"></div></div></td>
+      <td class="pnum" style="color:${c}">${p.total}</td>
+    </tr>`;
+  }).join('');
+}
+
+/* ── category chart ── */
+let catChart;
+function renderCat(){
+  document.getElementById('catTitle').textContent=`Category Mix — ${activeRetailer}`;
+  const cats=getCatTotals();
+  const labels=Object.keys(cats),vals=Object.values(cats),colors=labels.map(l=>SEC_COLORS[l]||'#6e6e73');
+  const ctx=document.getElementById('catChart').getContext('2d');
+  if(catChart)catChart.destroy();
+  catChart=new Chart(ctx,{type:'doughnut',data:{labels,datasets:[{data:vals,backgroundColor:colors,borderWidth:2,borderColor:'#2c2c2e',hoverOffset:5}]},options:{responsive:true,maintainAspectRatio:false,cutout:'70%',plugins:{legend:{display:false},tooltip:{backgroundColor:'rgba(44,44,46,0.95)',titleColor:'#f5f5f7',bodyColor:'#aeaeb2',borderColor:'rgba(255,255,255,0.1)',borderWidth:1,cornerRadius:8,callbacks:{label:ctx=>` ${ctx.label.replace(' SOLD','')}: ${ctx.parsed.toLocaleString()}`}}}}});
+  const total=vals.reduce((a,b)=>a+b,0);
+  document.getElementById('catLegend').innerHTML=labels.map((l,i)=>`<div class="cat-leg-item"><div class="cat-dot" style="background:${colors[i]}"></div><div style="flex:1;color:var(--text-3)">${l.replace(' SOLD','')}</div><div style="font-weight:600;color:var(--text)">${vals[i]}</div><div style="color:var(--text-3);width:32px;text-align:right">${total>0?Math.round(vals[i]/total*100):0}%</div></div>`).join('');
+}
+
+/* ── sparklines ── */
+const sparkCharts={};
+function makeSVGSpark(data, color){
+  const W=200, H=48, pad=2;
+  const pos=data.filter(v=>v>0);
+  const maxV=Math.max(...pos,1);
+  const n=data.length;
+  const bw=Math.max(1,(W-(n+1)*pad)/n);
+  let bars='';
+  data.forEach((v,i)=>{
+    const h=v>0?Math.round((v/maxV)*(H-4)):0;
+    const x=pad+i*(bw+pad);
+    const y=H-h;
+    const fill=v>0?color+'cc':'#ff453a44';
+    if(h>0) bars+=`<rect x="${x.toFixed(1)}" y="${y}" width="${bw.toFixed(1)}" height="${h}" rx="1.5" fill="${fill}"/>`;
+    else bars+=`<rect x="${x.toFixed(1)}" y="${H-2}" width="${bw.toFixed(1)}" height="2" rx="1" fill="${fill}"/>`;
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%;height:${H}px;display:block">${bars}</svg>`;
+}
+
+function renderSparks(){
+  const grid=document.getElementById('sparkGrid');
+  grid.innerHTML='';
+  // destroy old Chart.js instances
+  Object.keys(sparkCharts).forEach(r=>{ if(sparkCharts[r]&&sparkCharts[r].destroy) sparkCharts[r].destroy(); });
+
+  RETAILERS.forEach((r,i)=>{
+    const totals=getWeekSlice(getWeeklyTotals(r));
+    const peak=Math.max(...totals.filter(v=>v>0),0);
+    const peakWk=WEEKS[wkFrom+totals.indexOf(peak)]||'';
+    const card=document.createElement('div');
+    card.className='spark-card';
+    card.innerHTML=`
+      <div class="spark-top">
+        <div style="min-width:0;flex:1;overflow:hidden">
+          <div class="spark-name">${r}</div>
+          <div class="spark-total" style="color:${COLORS[i]}">${(EDIT[r]?EDIT[r].total:0).toLocaleString()}</div>
+        </div>
+        <div class="spark-peak">
+          <div class="spark-peak-val" style="color:${COLORS[i]}">${peak}</div>
+          <div class="spark-peak-wk">${peakWk}</div>
+        </div>
+      </div>
+      <div class="spark-canvas">${makeSVGSpark(totals,COLORS[i])}</div>`;
+    grid.appendChild(card);
+  });
+}
+
+/* ══════════════════════════════════════
+   DETAIL TABLE — INTERACTIVE
+══════════════════════════════════════ */
+let saveTimer=null;
+function debouncedSave(){
+  clearTimeout(saveTimer);
+  saveTimer=setTimeout(()=>saveToSupabase(),1500);
+}
+
+function recalcTotals(retailer, secName){
+  const sec=EDIT[retailer].sections[secName];
+  sec.products.forEach(p=>{ p.total=p.weekly.reduce((a,b)=>a+b,0); });
+  sec.total=sec.products.reduce((s,p)=>s+p.total,0);
+  EDIT[retailer].total=Object.values(EDIT[retailer].sections).reduce((s,sd)=>s+sd.total,0);
+  EDIT[retailer].weekly_totals=getWeeklyTotals(retailer);
+  debouncedSave();
+}
+
+function cellClass(v,mean,stdDev){
+  if(v===0)return 'cell-zero';
+  if(v<0)return 'cell-neg';
+  if(v>=mean+stdDev)return 'cell-high';
+  if(v>mean)return 'cell-med';
+  return 'cell-pos';
+}
+
+// Per-section custom column lists (extends WEEK_HEADERS with user-added columns)
+const SEC_COLS = {}; // key: "retailer__secName" -> [{wk,date,day,idx}]
+
+function getDayFromDate(dateStr){
+  // dateStr like "4-Jan", "28-Jun"
+  if(!dateStr) return '';
+  try {
+    const months = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+    const [d, m] = dateStr.split('-');
+    const dt = new Date(2026, months[m], parseInt(d));
+    return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][dt.getDay()];
+  } catch(e){ return ''; }
+}
+
+function getSecKey(retailer, secName){ return (retailer+'__'+secName).replace(/[^a-z0-9_]/gi,'_'); }
+
+function getSecCols(retailer, secName){
+  const key = getSecKey(retailer, secName);
+  if(!SEC_COLS[key]) SEC_COLS[key] = WEEK_HEADERS.map((h,i)=>({...h, idx:i, custom:false}));
+  return SEC_COLS[key];
+}
+
+function addWeekColumn(retailer, secName){
+  const cols = getSecCols(retailer, secName);
+  // suggest next WK after the last one
+  const lastWk = cols.length ? parseInt(cols[cols.length-1].wk.replace('WK',''))||52 : 52;
+  const nextWk = lastWk + 1;
+  const wkName = prompt('Week label:', `WK${nextWk}`) || '';
+  if(!wkName.trim()) return;
+  const dateLabel = prompt('Date label (e.g. 5-Jul):', '') || '';
+  const dayLabel = getDayFromDate(dateLabel.trim());
+  const newCol = { wk: wkName.trim(), date: dateLabel.trim(), day: dayLabel, custom: true };
+
+  // propagate to ALL retailers and ALL sections
+  Object.keys(EDIT).forEach(r => {
+    Object.keys(EDIT[r].sections).forEach(sec => {
+      const c = getSecCols(r, sec);
+      const newIdx = c.length;
+      c.push({ ...newCol, idx: newIdx });
+      // extend each product's weekly array
+      EDIT[r].sections[sec].products.forEach(p => {
+        while(p.weekly.length <= newIdx) p.weekly.push(0);
+      });
+    });
+  });
+
+  // also add to the global WEEK_HEADERS and WEEKS so new sections created later include it
+  WEEK_HEADERS.push({ ...newCol });
+  WEEKS.push(newCol.wk);
+
+  // refresh the week range selects in Overview toolbar
+  refreshWeekSelects();
+
+  // rebuild all visible section tables
+  rebuildAllSectionTables();
+
+  // if overview is visible, refresh it too
+  if(currentView === 'overview') renderAll();
+}
+
+function removeWeekColumn(retailer, secName, colIdx){
+  const cols = getSecCols(retailer, secName);
+  const wkLabel = cols[colIdx]?.wk;
+  if(!confirm(`Remove column "${wkLabel}" from ALL sections?`)) return;
+
+  // propagate removal to ALL retailers and ALL sections
+  Object.keys(EDIT).forEach(r => {
+    Object.keys(EDIT[r].sections).forEach(sec => {
+      const c = getSecCols(r, sec);
+      // find matching column by wk label
+      const idx = c.findIndex(h => h.wk === wkLabel);
+      if(idx === -1) return;
+      c.splice(idx, 1);
+      EDIT[r].sections[sec].products.forEach(p => { p.weekly.splice(idx, 1); });
+      recalcTotals(r, sec);
+    });
+  });
+
+  // also remove from global WEEK_HEADERS and WEEKS
+  const ghIdx = WEEK_HEADERS.findIndex(h => h.wk === wkLabel);
+  if(ghIdx !== -1) WEEK_HEADERS.splice(ghIdx, 1);
+  const wIdx = WEEKS.indexOf(wkLabel);
+  if(wIdx !== -1) WEEKS.splice(wIdx, 1);
+
+  // refresh Overview week selects
+  refreshWeekSelects();
+
+  rebuildAllSectionTables();
+  refreshDetailHeader();
+
+  if(currentView === 'overview') renderAll();
+}
+
+function rebuildAllSectionTables(){
+  // rebuild every visible sec-block in the detail view
+  document.querySelectorAll('.sec-block').forEach(block => {
+    const r = block.dataset.retailer;
+    const s = block.dataset.section;
+    if(r && s) rebuildSectionTable(r, s);
+  });
+}
+
+function rebuildSectionTable(retailer, secName){
+  const secData = EDIT[retailer].sections[secName];
+  const secColor = SEC_COLORS[secName] || '#0a84ff';
+  const sid = `sb_${retailer}_${secName}`.replace(/[^a-z0-9]/gi,'_');
+  // rebuild thead
+  const thead = document.querySelector(`#tb_${sid}`)?.closest('table')?.querySelector('thead tr');
+  if(thead){
+    const cols = getSecCols(retailer, secName);
+    let th = `<th class="col-name">Product</th><th class="col-total">Total</th>`;
+    cols.forEach((h,ci)=>{
+      th += `<th style="min-width:80px;width:80px;">
+        <div style="display:flex;align-items:center;justify-content:center;gap:3px">
+          <span contenteditable="true" spellcheck="false"
+            style="outline:none;border-bottom:1px dashed transparent;transition:border-color .15s;font-weight:700"
+            onblur="updateColLabel('${retailer}','${secName}',${ci},'wk',this.textContent.trim())"
+            onfocus="this.style.borderBottomColor='var(--blue)'">${h.wk}</span>
+          <button onclick="removeWeekColumn('${retailer}','${secName}',${ci})"
+            title="Remove column"
+            style="background:none;border:none;color:var(--text-3);cursor:pointer;font-size:9px;padding:0 1px;line-height:1;opacity:0.6"
+            onmouseover="this.style.color='var(--red)';this.style.opacity=1"
+            onmouseout="this.style.color='var(--text-3)';this.style.opacity=0.6">✕</button>
+        </div>
+        <div contenteditable="true" spellcheck="false"
+          style="font-size:9px;color:var(--text-3);margin-top:1px;outline:none;border-bottom:1px dashed transparent;transition:border-color .15s"
+          onblur="updateColLabel('${retailer}','${secName}',${ci},'date',this.textContent.trim());updateColDay('${retailer}','${secName}',${ci})"
+          onfocus="this.style.borderBottomColor='var(--blue)'">${h.date}</div>
+        <div style="font-size:9px;color:var(--amber);margin-top:1px;font-weight:500">${h.day||''}</div>
+      </th>`;
+    });
+    th += `<th class="col-del" style="text-align:center">
+      <button class="ic-btn btn-add" style="padding:2px 7px;font-size:10px;white-space:nowrap" 
+        onclick="addWeekColumn('${retailer}','${secName}')">+ WK</button>
+    </th>`;
+    thead.innerHTML = th;
+  }
+  // rebuild tbody
+  const tbody = document.getElementById(`tb_${sid}`);
+  if(tbody) renderTbody(tbody, retailer, secName, secData, secColor);
+}
+
+function updateColLabel(retailer, secName, colIdx, field, val){
+  if(!val) return;
+  const cols = getSecCols(retailer, secName);
+  if(cols[colIdx]) cols[colIdx][field] = val;
+}
+
+function updateColDay(retailer, secName, colIdx){
+  const cols = getSecCols(retailer, secName);
+  if(!cols[colIdx]) return;
+  const day = getDayFromDate(cols[colIdx].date);
+  cols[colIdx].day = day;
+  // update the displayed day label without full rebuild
+  const key = (retailer+'_'+secName+'_'+colIdx).replace(/[^a-z0-9_]/gi,'_');
+  const el = document.getElementById('day_'+key);
+  if(el) el.textContent = day;
+}
+
+function renderTbody(tbody, retailer, secName, secData, secColor){
+  tbody.innerHTML='';
+  const prods=secData.products;
+  const cols=getSecCols(retailer, secName);
+  const nCols=cols.length;
+  const maxProd=Math.max(...prods.map(p=>Math.abs(p.total)),1);
+  prods.forEach((p,pIdx)=>{
+    const weekly=p.weekly.slice(0, nCols);
+    while(weekly.length<nCols) weekly.push(0);
+    const pos=weekly.filter(v=>v>0);
+    const mean=pos.length?pos.reduce((a,b)=>a+b,0)/pos.length:0;
+    const sd=pos.length>1?Math.sqrt(pos.reduce((s,v)=>s+(v-mean)**2,0)/pos.length):0;
+    const barPct=Math.round(Math.max(p.total,0)/maxProd*100);
+    const tr=document.createElement('tr');
+    // name td
+    const ntd=document.createElement('td'); ntd.className='col-name';
+    ntd.innerHTML=`<div><span class="name-editable" contenteditable="true" spellcheck="false">${p.name}</span><span class="nano-bar"><span class="nano-fill" style="width:${barPct}%;background:${secColor}"></span></span></div>`;
+    const ne=ntd.querySelector('.name-editable');
+    ne.addEventListener('focus',()=>ne.style.borderBottomColor='var(--blue)');
+    ne.addEventListener('blur',()=>{ ne.style.borderBottomColor='transparent'; const v=ne.textContent.trim(); if(v)EDIT[retailer].sections[secName].products[pIdx].name=v; });
+    tr.appendChild(ntd);
+    // total td
+    const ttd=document.createElement('td'); ttd.className='col-total';
+    ttd.textContent=p.total!==0?p.total:'—'; tr.appendChild(ttd);
+    // weekly tds
+    weekly.forEach((v,wIdx)=>{
+      const td=document.createElement('td');
+      td.className=cellClass(v,mean,sd);
+      td.contentEditable='true'; td.spellcheck=false;
+      td.textContent=v===0?'—':v;
+      td.addEventListener('focus',function(){ if(this.textContent==='—')this.textContent=''; });
+      td.addEventListener('blur',function(){
+        let val=parseInt(this.textContent.trim(),10);
+        if(isNaN(val))val=0;
+        while(EDIT[retailer].sections[secName].products[pIdx].weekly.length<=wIdx)
+          EDIT[retailer].sections[secName].products[pIdx].weekly.push(0);
+        EDIT[retailer].sections[secName].products[pIdx].weekly[wIdx]=val;
+        recalcTotals(retailer,secName);
+        refreshSection(retailer,secName);
+      });
+      td.addEventListener('keydown',function(e){
+        if(e.key==='Enter'){e.preventDefault();this.blur();}
+        if(e.key==='Escape'){this.textContent=v===0?'—':v;this.blur();}
+        if(!/[\d\-]/.test(e.key)&&!['Backspace','Delete','ArrowLeft','ArrowRight','Tab'].includes(e.key))e.preventDefault();
+      });
+      tr.appendChild(td);
+    });
+    // del btn td
+    const dtd=document.createElement('td'); dtd.style.cssText='text-align:center;padding:4px;border-right:none';
+    const db=document.createElement('button'); db.className='btn-del-row'; db.textContent='✕'; db.title='Remove row';
+    db.onclick=()=>{ EDIT[retailer].sections[secName].products.splice(pIdx,1); recalcTotals(retailer,secName); refreshSection(retailer,secName); refreshDetailHeader(); };
+    dtd.appendChild(db); tr.appendChild(dtd);
+    tbody.appendChild(tr);
+  });
+  // weekly total row
+  const wt=new Array(nCols).fill(0);
+  prods.forEach(p=>{ const wk=p.weekly.slice(0,nCols); wk.forEach((v,i)=>wt[i]+=(v||0)); });
+  const ttr=document.createElement('tr'); ttr.className='wk-total-row';
+  ttr.innerHTML=`<td class="col-name">Weekly Total</td><td class="col-total">${wt.reduce((a,b)=>a+b,0)||'—'}</td>`;
+  wt.forEach(v=>{ const td=document.createElement('td'); td.textContent=v||'—'; ttr.appendChild(td); });
+  const etd=document.createElement('td'); ttr.appendChild(etd);
+  tbody.appendChild(ttr);
+}
+
+function buildSectionBlock(retailer, secName, secData, secColor){
+  const block=document.createElement('div'); block.className='sec-block';
+  block.dataset.retailer=retailer; block.dataset.section=secName;
+  const sid=`sb_${retailer}_${secName}`.replace(/[^a-z0-9]/gi,'_');
+  // header
+  const hd=document.createElement('div'); hd.className='sec-hd';
+  hd.innerHTML=`<span class="sec-hd-name" style="color:${secColor}" contenteditable="true" spellcheck="false">${secName}</span><div class="sec-hd-right"><span class="sec-total" style="color:${secColor}" id="st_${sid}">${secData.total>0?secData.total.toLocaleString():'—'}</span><button class="ic-btn btn-del" onclick="removeSection('${retailer}','${secName}')" title="Remove section">✕</button></div>`;
+  block.appendChild(hd);
+  // scroll+table
+  const scroll=document.createElement('div'); scroll.className='tbl-scroll';
+  const tbl=document.createElement('table'); tbl.className='so-table';
+  const cols0=getSecCols(retailer, secName);
+  let th=`<th class="col-name">Product</th><th class="col-total">Total</th>`;
+  cols0.forEach((h,ci)=>{
+    th+=`<th style="min-width:80px;width:80px;">
+      <div style="display:flex;align-items:center;justify-content:center;gap:3px">
+        <span contenteditable="true" spellcheck="false"
+          style="outline:none;border-bottom:1px dashed transparent;transition:border-color .15s;font-weight:700"
+          onblur="updateColLabel('${retailer}','${secName}',${ci},'wk',this.textContent.trim())"
+          onfocus="this.style.borderBottomColor='var(--blue)'">${h.wk}</span>
+        <button onclick="removeWeekColumn('${retailer}','${secName}',${ci})"
+          title="Remove column"
+          style="background:none;border:none;color:var(--text-3);cursor:pointer;font-size:9px;padding:0 1px;line-height:1;opacity:0.6"
+          onmouseover="this.style.color='var(--red)';this.style.opacity=1"
+          onmouseout="this.style.color='var(--text-3)';this.style.opacity=0.6">✕</button>
+      </div>
+      <div contenteditable="true" spellcheck="false"
+        style="font-size:9px;color:var(--text-3);margin-top:1px;outline:none;border-bottom:1px dashed transparent;transition:border-color .15s"
+        onblur="updateColLabel('${retailer}','${secName}',${ci},'date',this.textContent.trim());updateColDay('${retailer}','${secName}',${ci})"
+        onfocus="this.style.borderBottomColor='var(--blue)'">${h.date}</div>
+      <div style="font-size:9px;color:var(--amber);margin-top:1px;font-weight:500">${h.day||''}</div>
+    </th>`;
+  });
+  th+=`<th class="col-del" style="text-align:center">
+    <button class="ic-btn btn-add" style="padding:2px 7px;font-size:10px;white-space:nowrap"
+      onclick="addWeekColumn('${retailer}','${secName}')">+ WK</button>
+  </th>`;
+  tbl.innerHTML=`<thead><tr>${th}</tr></thead>`;
+  const tbody=document.createElement('tbody'); tbody.id=`tb_${sid}`;
+  renderTbody(tbody,retailer,secName,secData,secColor);
+  tbl.appendChild(tbody); scroll.appendChild(tbl); block.appendChild(scroll);
+  // add row button
+  const ab=document.createElement('div'); ab.className='sec-add-bar';
+  ab.innerHTML=`<button class="ic-btn btn-add" onclick="addProduct('${retailer}','${secName}')">+ Add Product</button>`;
+  block.appendChild(ab);
+  return block;
+}
+
+function refreshSection(retailer, secName){
+  const sd=EDIT[retailer].sections[secName];
+  const sc=SEC_COLORS[secName]||'#6e6e73';
+  const sid=`sb_${retailer}_${secName}`.replace(/[^a-z0-9]/gi,'_');
+  const tbody=document.getElementById(`tb_${sid}`);
+  if(tbody)renderTbody(tbody,retailer,secName,sd,sc);
+  const st=document.getElementById(`st_${sid}`);
+  if(st)st.textContent=sd.total>0?sd.total.toLocaleString():'—';
+  refreshDetailHeader();
+}
+
+function refreshDetailHeader(){
+  if(activeRetailer==='All'){
+    const grand=Object.values(EDIT).reduce((s,r)=>s+r.total,0);
+    document.getElementById('detailTotalBadge').textContent=grand.toLocaleString();
+  } else {
+    document.getElementById('detailTotalBadge').textContent=(EDIT[activeRetailer]?.total||0).toLocaleString();
+  }
+}
+
+function addProduct(retailer, secName){
+  EDIT[retailer].sections[secName].products.push({name:'New Product',total:0,weekly:new Array(26).fill(0)});
+  refreshSection(retailer,secName);
+}
+function removeSection(retailer, secName){
+  if(!confirm(`Remove "${secName}"?`))return;
+  delete EDIT[retailer].sections[secName];
+  renderDetail();
+}
+function addSection(retailer){
+  const name=prompt('Section name:'); if(!name)return;
+  if(EDIT[retailer].sections[name]){alert('Already exists');return;}
+  EDIT[retailer].sections[name]={total:0,products:[]};
+  renderDetail();
+}
+function addRetailerBlock(){
+  const name=prompt('Retailer name:'); if(!name)return;
+  if(EDIT[name]){alert('Already exists');return;}
+  EDIT[name]={total:0,weeks:[...WEEKS],weekly_totals:new Array(26).fill(0),sections:{}};
+  renderDetail();
+}
+
+function renderRetailerBlock(container, retailer){
+  const rd=EDIT[retailer];
+  const rIdx=RETAILERS.indexOf(retailer);
+  const color=COLORS[rIdx]||'#0a84ff';
+  if(activeRetailer==='All'){
+    const h=document.createElement('div'); h.className='ret-heading';
+    h.innerHTML=`<span class="ret-heading-name" style="color:${color}">${retailer}</span><div class="ret-heading-right"><span class="ret-total-badge" style="background:${color}">${rd.total.toLocaleString()}</span><button class="ic-btn btn-add" onclick="addSection('${retailer}')">+ Section</button></div>`;
+    container.appendChild(h);
+  }
+  Object.entries(rd.sections).forEach(([secName,secData])=>{
+    const sc=SEC_COLORS[secName]||'#6e6e73';
+    container.appendChild(buildSectionBlock(retailer,secName,secData,sc));
+  });
+}
+
+function renderDetail(){
+  const container=document.getElementById('detailSections');
+  container.innerHTML='';
+  const isAll=activeRetailer==='All';
+  const rets=isAll?Object.keys(EDIT):[activeRetailer];
+  if(isAll){
+    document.getElementById('detailRetailerName').textContent='All Retailers';
+    document.getElementById('detailTotalBadge').textContent=Object.values(EDIT).reduce((s,r)=>s+r.total,0).toLocaleString();
+  } else {
+    document.getElementById('detailRetailerName').textContent=activeRetailer;
+    document.getElementById('detailTotalBadge').textContent=(EDIT[activeRetailer]?.total||0).toLocaleString();
+  }
+  rets.forEach(r=>renderRetailerBlock(container,r));
+  const bb=document.createElement('div'); bb.className='bottom-bar';
+  if(!isAll){
+    bb.innerHTML=`<button class="ic-btn btn-add" style="padding:8px 16px;font-size:12px" onclick="addSection('${activeRetailer}')">+ Add Section</button>`;
+  } else {
+    bb.innerHTML=`<button class="ic-btn btn-add" style="padding:8px 16px;font-size:12px" onclick="addRetailerBlock()">+ Add Retailer</button>`;
+  }
+  container.appendChild(bb);
+}
+
+/* ── render all ── */
+function renderAll(){
+  if(currentView==='overview'){
+    renderKpis();renderTrend();renderShare();renderPills();renderProducts();renderCat();renderSparks();
+  } else {
+    renderDetail();
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>
