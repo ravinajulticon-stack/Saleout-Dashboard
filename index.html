@@ -604,8 +604,11 @@ async function saveToSupabase(){
       for(const [secName, sec] of Object.entries(rd.sections)){
         const secId = rId+'__'+secName.toLowerCase().replace(/[^a-z0-9]/g,'_');
         await sb.from('sections').upsert({ id:secId, retailer_id:rId, name:secName, total:sec.total });
+        // First delete old duplicates for this section, keep only current products
+        const currentIds = sec.products.filter(p=>p.id).map(p=>p.id);
         for(const p of sec.products){
-          if(!p.id) p.id = uid('p_');
+          // Assign stable ID based on section+product name if not already set
+          if(!p.id) p.id = 'p_' + (secId+'__'+p.name).toLowerCase().replace(/[^a-z0-9]/g,'_').slice(0,30);
           await sb.from('products').upsert({ id:p.id, section_id:secId, retailer_id:rId, name:p.name, total:p.total });
           const salesRows = p.weekly.map((qty,wi) => ({
             id: p.id+'__'+wi,
@@ -631,10 +634,17 @@ async function loadFromSupabase(){
   try {
     const { data: retailers } = await sb.from('retailers').select('*');
     if(!retailers || retailers.length === 0){
-      // No data yet — save the default RAW data
+      // No data yet — assign stable IDs then save
       setSyncStatus('saving');
-      // assign IDs to all products first
-      Object.values(EDIT).forEach(rd => Object.values(rd.sections).forEach(sec => sec.products.forEach(p => { if(!p.id) p.id = uid('p_'); })));
+      Object.entries(EDIT).forEach(([rName, rd]) => {
+        const rId = rName.toLowerCase().replace(/\s/g,'_');
+        Object.entries(rd.sections).forEach(([secName, sec]) => {
+          const secId = rId+'__'+secName.toLowerCase().replace(/[^a-z0-9]/g,'_');
+          sec.products.forEach(p => {
+            if(!p.id) p.id = 'p_'+(secId+'__'+p.name).toLowerCase().replace(/[^a-z0-9]/g,'_').slice(0,30);
+          });
+        });
+      });
       await saveToSupabase();
       setSyncStatus('loaded');
       return;
