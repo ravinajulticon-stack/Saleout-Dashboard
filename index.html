@@ -608,7 +608,13 @@ async function saveToSupabase(){
         const secId = rId+'__'+secName.toLowerCase().replace(/[^a-z0-9]/g,'_');
         allSections.push({ id:secId, retailer_id:rId, name:secName, total:sec.total });
         for(const p of sec.products){
-          if(!p.id) p.id = 'p_'+(secId+'__'+p.name).toLowerCase().replace(/[^a-z0-9]/g,'_').slice(0,30);
+          if(!p.id){
+            // Generate stable ID using full string hash (no truncation)
+            const raw = (secId+'__'+p.name).toLowerCase().replace(/[^a-z0-9]/g,'_');
+            let h = 0;
+            for(let i=0;i<raw.length;i++){ h = Math.imul(31,h)+raw.charCodeAt(i)|0; }
+            p.id = 'p_' + Math.abs(h).toString(36) + '_' + raw.slice(0,12);
+          }
           allProducts.push({ id:p.id, section_id:secId, retailer_id:rId, name:p.name, total:p.total });
           p.weekly.forEach((qty,wi)=>{
             allSales.push({ id:p.id+'__'+wi, product_id:p.id, week_label:WEEK_HEADERS[wi]?.wk||'WK'+(27+wi), qty });
@@ -644,7 +650,13 @@ async function loadFromSupabase(){
         Object.entries(rd.sections).forEach(([secName, sec]) => {
           const secId = rId+'__'+secName.toLowerCase().replace(/[^a-z0-9]/g,'_');
           sec.products.forEach(p => {
-            if(!p.id) p.id = 'p_'+(secId+'__'+p.name).toLowerCase().replace(/[^a-z0-9]/g,'_').slice(0,30);
+            if(!p.id){
+            // Generate stable ID using full string hash (no truncation)
+            const raw = (secId+'__'+p.name).toLowerCase().replace(/[^a-z0-9]/g,'_');
+            let h = 0;
+            for(let i=0;i<raw.length;i++){ h = Math.imul(31,h)+raw.charCodeAt(i)|0; }
+            p.id = 'p_' + Math.abs(h).toString(36) + '_' + raw.slice(0,12);
+          }
           });
         });
       });
