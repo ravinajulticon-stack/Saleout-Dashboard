@@ -607,7 +607,7 @@ async function saveToSupabase(){
       for(const [secName, sec] of Object.entries(rd.sections)){
         const secId = rId+'__'+secName.toLowerCase().replace(/[^a-z0-9]/g,'_');
         allSections.push({ id:secId, retailer_id:rId, name:secName, total:sec.total });
-        for(const p of sec.products){
+        sec.products.forEach((p,pIdx)=>{
           if(!p.id){
             // Generate stable ID using full string hash (no truncation)
             const raw = (secId+'__'+p.name).toLowerCase().replace(/[^a-z0-9]/g,'_');
@@ -615,11 +615,11 @@ async function saveToSupabase(){
             for(let i=0;i<raw.length;i++){ h = Math.imul(31,h)+raw.charCodeAt(i)|0; }
             p.id = 'p_' + Math.abs(h).toString(36) + '_' + raw.slice(0,12);
           }
-          allProducts.push({ id:p.id, section_id:secId, retailer_id:rId, name:p.name, total:p.total });
+          allProducts.push({ id:p.id, section_id:secId, retailer_id:rId, name:p.name, total:p.total, sort_order:pIdx });
           p.weekly.forEach((qty,wi)=>{
             allSales.push({ id:p.id+'__'+wi, product_id:p.id, week_label:WEEK_HEADERS[wi]?.wk||'WK'+(27+wi), qty });
           });
-        }
+        });
       }
     }
 
@@ -704,6 +704,8 @@ async function loadFromSupabase(){
       salesByProduct[ws.product_id][ws.week_label] = ws.qty;
     });
 
+    // Sort by sort_order to preserve original product order
+    products.sort((a,b)=>(a.sort_order||0)-(b.sort_order||0));
     products.forEach(p => {
       const r = retailers.find(r => r.id === p.retailer_id);
       const sec = sections.find(s => s.id === p.section_id);
