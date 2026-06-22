@@ -632,7 +632,7 @@ async function saveToSupabase(){
 async function loadFromSupabase(){
   setSyncStatus('loading');
   try {
-    const { data: retailers } = await sb.from('retailers').select('*');
+    const { data: retailers } = await sb.from('retailers').select('*').limit(1000);
     if(!retailers || retailers.length === 0){
       // No data yet — assign stable IDs then save
       setSyncStatus('saving');
@@ -650,10 +650,10 @@ async function loadFromSupabase(){
       return;
     }
 
-    const { data: sections }    = await sb.from('sections').select('*');
-    const { data: products }    = await sb.from('products').select('*');
-    const { data: weekly_sales} = await sb.from('weekly_sales').select('*');
-    const { data: wkHeaders }   = await sb.from('week_headers').select('*').order('idx');
+    const { data: sections }    = await sb.from('sections').select('*').limit(10000);
+    const { data: products }    = await sb.from('products').select('*').limit(10000);
+    const { data: weekly_sales} = await sb.from('weekly_sales').select('*').limit(100000);
+    const { data: wkHeaders }   = await sb.from('week_headers').select('*').order('idx').limit(1000);
 
     // Rebuild WEEK_HEADERS
     if(wkHeaders && wkHeaders.length > 0){
