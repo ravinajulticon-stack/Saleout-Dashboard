@@ -588,7 +588,7 @@ async function saveToSupabase(){
   try {
     // 1. Upsert all retailers in one call
     const retailers = Object.keys(EDIT).map(name => ({
-      id: name.toLowerCase().replace(/\s/g,'_'),
+      id: name.toLowerCase().replace(/[^a-z0-9]/g,'_'),
       name, total: EDIT[name].total
     }));
     await sb.from('retailers').upsert(retailers);
@@ -603,7 +603,7 @@ async function saveToSupabase(){
     const allSales = [];
 
     for(const [rName, rd] of Object.entries(EDIT)){
-      const rId = rName.toLowerCase().replace(/\s/g,'_');
+      const rId = rName.toLowerCase().replace(/[^a-z0-9]/g,'_');
       for(const [secName, sec] of Object.entries(rd.sections)){
         const secId = rId+'__'+secName.toLowerCase().replace(/[^a-z0-9]/g,'_');
         allSections.push({ id:secId, retailer_id:rId, name:secName, total:sec.total });
@@ -646,7 +646,7 @@ async function loadFromSupabase(){
       // No data yet — assign stable IDs then save
       setSyncStatus('saving');
       Object.entries(EDIT).forEach(([rName, rd]) => {
-        const rId = rName.toLowerCase().replace(/\s/g,'_');
+        const rId = rName.toLowerCase().replace(/[^a-z0-9]/g,'_');
         Object.entries(rd.sections).forEach(([secName, sec]) => {
           const secId = rId+'__'+secName.toLowerCase().replace(/[^a-z0-9]/g,'_');
           sec.products.forEach(p => {
