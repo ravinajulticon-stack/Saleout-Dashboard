@@ -927,6 +927,44 @@ function debouncedSave(){
   saveTimer=setTimeout(()=>saveToSupabase(),1500);
 }
 
+// Recalc totals without triggering save or re-render
+function recalcTotalsOnly(retailer, secName){
+  const sec=EDIT[retailer].sections[secName];
+  sec.products.forEach(p=>{ p.total=p.weekly.reduce((a,b)=>a+b,0); });
+  sec.total=sec.products.reduce((s,p)=>s+p.total,0);
+  EDIT[retailer].total=Object.values(EDIT[retailer].sections).reduce((s,sd)=>s+sd.total,0);
+  EDIT[retailer].weekly_totals=getWeeklyTotals(retailer);
+}
+
+// Update only the total display cells without full re-render
+function updateTotalCells(retailer, secName){
+  const sec=EDIT[retailer].sections[secName];
+  const sid=`tb_${(retailer+'_'+secName).replace(/[^a-z0-9]/gi,'_')}`;
+  const tbody=document.getElementById(sid);
+  if(!tbody) return;
+  const rows=tbody.querySelectorAll('tr:not(.wk-total-row)');
+  rows.forEach((tr,pIdx)=>{
+    const p=sec.products[pIdx];
+    if(!p) return;
+    const ttd=tr.querySelector('.col-total');
+    if(ttd) ttd.textContent=p.total!==0?p.total:'—';
+  });
+  // update weekly total row
+  const wkTotalRow=tbody.querySelector('.wk-total-row');
+  if(wkTotalRow){
+    const cols=getSecCols(retailer,secName);
+    const wt=new Array(cols.length).fill(0);
+    sec.products.forEach(p=>{ const wk=p.weekly.slice(0,cols.length); wk.forEach((v,i)=>wt[i]+=(v||0)); });
+    const tds=wkTotalRow.querySelectorAll('td');
+    if(tds[1]) tds[1].textContent=wt.reduce((a,b)=>a+b,0)||'—';
+    wt.forEach((v,i)=>{ if(tds[i+2]) tds[i+2].textContent=v||'—'; });
+  }
+  // update section total badge
+  const totalEl=document.getElementById(`sectotal_${retailer}_${secName}`.replace(/[^a-z0-9]/gi,'_'));
+  if(totalEl) totalEl.textContent=sec.total>0?sec.total.toLocaleString():'—';
+  refreshDetailHeader();
+}
+
 function recalcTotals(retailer, secName){
   const sec=EDIT[retailer].sections[secName];
   sec.products.forEach(p=>{ p.total=p.weekly.reduce((a,b)=>a+b,0); });
@@ -1151,11 +1189,14 @@ function renderTbody(tbody, retailer, secName, secData, secColor){
       td.addEventListener('blur',function(){
         let val=parseInt(this.textContent.trim(),10);
         if(isNaN(val))val=0;
+        this.textContent = val===0?'—':val;
         while(EDIT[retailer].sections[secName].products[pIdx].weekly.length<=wIdx)
           EDIT[retailer].sections[secName].products[pIdx].weekly.push(0);
         EDIT[retailer].sections[secName].products[pIdx].weekly[wIdx]=val;
-        recalcTotals(retailer,secName);
-        refreshSection(retailer,secName);
+        // recalc without re-rendering the whole section (avoids destroying edited cells)
+        recalcTotalsOnly(retailer,secName);
+        updateTotalCells(retailer,secName);
+        debouncedSave();
       });
       td.addEventListener('keydown',function(e){
         if(e.key==='Enter'){e.preventDefault();this.blur();}
