@@ -586,40 +586,43 @@ function uid(prefix=''){
 async function saveToSupabase(){
   setSyncStatus('saving');
   try {
-    // 1. Upsert retailers
+    // 1. Upsert all retailers in one call
     const retailers = Object.keys(EDIT).map(name => ({
       id: name.toLowerCase().replace(/\s/g,'_'),
-      name,
-      total: EDIT[name].total
+      name, total: EDIT[name].total
     }));
     await sb.from('retailers').upsert(retailers);
 
-    // 2. Upsert week_headers
+    // 2. Upsert all week_headers in one call
     const wkRows = WEEK_HEADERS.map((h,i) => ({ idx:i, wk:h.wk, date:h.date||'', day:h.day||'' }));
     await sb.from('week_headers').upsert(wkRows);
 
-    // 3. Upsert sections + products + weekly_sales
+    // 3. Build all sections, products, weekly_sales arrays at once then batch upsert
+    const allSections = [];
+    const allProducts = [];
+    const allSales = [];
+
     for(const [rName, rd] of Object.entries(EDIT)){
       const rId = rName.toLowerCase().replace(/\s/g,'_');
       for(const [secName, sec] of Object.entries(rd.sections)){
         const secId = rId+'__'+secName.toLowerCase().replace(/[^a-z0-9]/g,'_');
-        await sb.from('sections').upsert({ id:secId, retailer_id:rId, name:secName, total:sec.total });
-        // First delete old duplicates for this section, keep only current products
-        const currentIds = sec.products.filter(p=>p.id).map(p=>p.id);
+        allSections.push({ id:secId, retailer_id:rId, name:secName, total:sec.total });
         for(const p of sec.products){
-          // Assign stable ID based on section+product name if not already set
-          if(!p.id) p.id = 'p_' + (secId+'__'+p.name).toLowerCase().replace(/[^a-z0-9]/g,'_').slice(0,30);
-          await sb.from('products').upsert({ id:p.id, section_id:secId, retailer_id:rId, name:p.name, total:p.total });
-          const salesRows = p.weekly.map((qty,wi) => ({
-            id: p.id+'__'+wi,
-            product_id: p.id,
-            week_label: WEEK_HEADERS[wi]?.wk || 'WK'+(27+wi),
-            qty
-          }));
-          await sb.from('weekly_sales').upsert(salesRows);
+          if(!p.id) p.id = 'p_'+(secId+'__'+p.name).toLowerCase().replace(/[^a-z0-9]/g,'_').slice(0,30);
+          allProducts.push({ id:p.id, section_id:secId, retailer_id:rId, name:p.name, total:p.total });
+          p.weekly.forEach((qty,wi)=>{
+            allSales.push({ id:p.id+'__'+wi, product_id:p.id, week_label:WEEK_HEADERS[wi]?.wk||'WK'+(27+wi), qty });
+          });
         }
       }
     }
+
+    // Batch upsert in chunks of 500 to avoid payload limits
+    const chunk = (arr,n) => Array.from({length:Math.ceil(arr.length/n)},(_,i)=>arr.slice(i*n,i*n+n));
+    await sb.from('sections').upsert(allSections);
+    for(const c of chunk(allProducts, 500)) await sb.from('products').upsert(c);
+    for(const c of chunk(allSales, 500)) await sb.from('weekly_sales').upsert(c);
+
     setSyncStatus('saved');
     setTimeout(()=>setSyncStatus(''), 2000);
   } catch(e){
