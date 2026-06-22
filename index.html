@@ -667,7 +667,15 @@ async function loadFromSupabase(){
 
     const { data: sections }    = await sb.from('sections').select('*').limit(10000);
     const { data: products }    = await sb.from('products').select('*').limit(10000);
-    const { data: weekly_sales} = await sb.from('weekly_sales').select('*').limit(100000);
+    // Paginate weekly_sales (Supabase free tier returns max 1000 rows per request)
+    let weekly_sales = [], ws_from = 0, ws_done = false;
+    while(!ws_done){
+      const { data: ws_page, error: ws_err } = await sb.from('weekly_sales').select('*').range(ws_from, ws_from+999);
+      if(ws_err || !ws_page || ws_page.length === 0) break;
+      weekly_sales = weekly_sales.concat(ws_page);
+      if(ws_page.length < 1000) ws_done = true;
+      else ws_from += 1000;
+    }
     const { data: wkHeaders }   = await sb.from('week_headers').select('*').order('idx').limit(1000);
 
     // Rebuild WEEK_HEADERS
