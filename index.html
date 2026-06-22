@@ -1411,7 +1411,8 @@ function renderAll(){
   }
 }
 
-renderAll();
+// Load from Supabase then render
+loadFromSupabase().then(()=>renderAll());
 </script>
 </body>
 </html>
