@@ -939,28 +939,30 @@ function recalcTotalsOnly(retailer, secName){
 // Update only the total display cells without full re-render
 function updateTotalCells(retailer, secName){
   const sec=EDIT[retailer].sections[secName];
-  const sid=`tb_${(retailer+'_'+secName).replace(/[^a-z0-9]/gi,'_')}`;
-  const tbody=document.getElementById(sid);
-  if(!tbody) return;
-  const rows=tbody.querySelectorAll('tr:not(.wk-total-row)');
-  rows.forEach((tr,pIdx)=>{
-    const p=sec.products[pIdx];
-    if(!p) return;
-    const ttd=tr.querySelector('.col-total');
-    if(ttd) ttd.textContent=p.total!==0?p.total:'—';
-  });
-  // update weekly total row
-  const wkTotalRow=tbody.querySelector('.wk-total-row');
-  if(wkTotalRow){
-    const cols=getSecCols(retailer,secName);
-    const wt=new Array(cols.length).fill(0);
-    sec.products.forEach(p=>{ const wk=p.weekly.slice(0,cols.length); wk.forEach((v,i)=>wt[i]+=(v||0)); });
-    const tds=wkTotalRow.querySelectorAll('td');
-    if(tds[1]) tds[1].textContent=wt.reduce((a,b)=>a+b,0)||'—';
-    wt.forEach((v,i)=>{ if(tds[i+2]) tds[i+2].textContent=v||'—'; });
+  // both tbody and section badge use the same sid pattern: sb_retailer_secName
+  const sid=`sb_${retailer}_${secName}`.replace(/[^a-z0-9]/gi,'_');
+  const tbody=document.getElementById(`tb_${sid}`);
+  if(tbody){
+    const rows=tbody.querySelectorAll('tr:not(.wk-total-row)');
+    rows.forEach((tr,pIdx)=>{
+      const p=sec.products[pIdx];
+      if(!p) return;
+      const ttd=tr.querySelector('.col-total');
+      if(ttd) ttd.textContent=p.total!==0?p.total:'—';
+    });
+    // update weekly total row
+    const wkTotalRow=tbody.querySelector('.wk-total-row');
+    if(wkTotalRow){
+      const cols=getSecCols(retailer,secName);
+      const wt=new Array(cols.length).fill(0);
+      sec.products.forEach(p=>{ const wk=p.weekly.slice(0,cols.length); wk.forEach((v,i)=>wt[i]+=(v||0)); });
+      const tds=wkTotalRow.querySelectorAll('td');
+      if(tds[1]) tds[1].textContent=wt.reduce((a,b)=>a+b,0)||'—';
+      wt.forEach((v,i)=>{ if(tds[i+2]) tds[i+2].textContent=v||'—'; });
+    }
   }
   // update section total badge
-  const totalEl=document.getElementById(`sectotal_${retailer}_${secName}`.replace(/[^a-z0-9]/gi,'_'));
+  const totalEl=document.getElementById(`st_${sid}`);
   if(totalEl) totalEl.textContent=sec.total>0?sec.total.toLocaleString():'—';
   refreshDetailHeader();
 }
