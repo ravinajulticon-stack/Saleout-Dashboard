@@ -312,6 +312,26 @@ body {
 .tbl-scroll::-webkit-scrollbar-track { background: var(--surface-2); border-radius: 4px; }
 .tbl-scroll::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 4px; } .tbl-scroll::-webkit-scrollbar-thumb:hover { background: var(--blue); }
 
+.tbl-scroll-wrap { display: flex; align-items: stretch; gap: 6px; width: 100%; }
+.tbl-scroll-wrap .tbl-scroll { flex: 1 1 auto; min-width: 0; }
+.tbl-scroll-arrow {
+  flex: 0 0 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-2);
+  border: 1px solid var(--surface-3);
+  border-radius: 6px;
+  color: var(--text-2);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+  user-select: none;
+  transition: background 0.15s, color 0.15s;
+}
+.tbl-scroll-arrow:hover { background: var(--blue); color: #fff; }
+.tbl-scroll-arrow:active { transform: scale(0.96); }
+
 /* saleout table */
 .so-table {
   width: max-content;
@@ -1326,7 +1346,27 @@ function buildSectionBlock(retailer, secName, secData, secColor){
   tbl.innerHTML=`<thead><tr>${th}</tr></thead>`;
   const tbody=document.createElement('tbody'); tbody.id=`tb_${sid}`;
   renderTbody(tbody,retailer,secName,secData,secColor);
-  tbl.appendChild(tbody); scroll.appendChild(tbl); block.appendChild(scroll);
+  tbl.appendChild(tbody); scroll.appendChild(tbl);
+
+  const scrollWrap=document.createElement('div'); scrollWrap.className='tbl-scroll-wrap';
+  const leftArrow=document.createElement('div'); leftArrow.className='tbl-scroll-arrow'; leftArrow.textContent='\u2039'; leftArrow.title='Scroll left';
+  const rightArrow=document.createElement('div'); rightArrow.className='tbl-scroll-arrow'; rightArrow.textContent='\u203a'; rightArrow.title='Scroll right';
+  const doScroll=(dir)=>{ scroll.scrollBy({left: dir*280, behavior:'smooth'}); };
+  leftArrow.onclick=()=>doScroll(-1);
+  rightArrow.onclick=()=>doScroll(1);
+  let holdTimer=null;
+  const startHold=(dir)=>{ doScroll(dir); holdTimer=setInterval(()=>doScroll(dir), 220); };
+  const stopHold=()=>{ if(holdTimer){ clearInterval(holdTimer); holdTimer=null; } };
+  [leftArrow,rightArrow].forEach((el,i)=>{
+    const dir = i===0?-1:1;
+    el.addEventListener('mousedown', (e)=>{ e.preventDefault(); startHold(dir); });
+    el.addEventListener('mouseup', stopHold);
+    el.addEventListener('mouseleave', stopHold);
+    el.addEventListener('touchstart', (e)=>{ e.preventDefault(); startHold(dir); }, {passive:false});
+    el.addEventListener('touchend', stopHold);
+  });
+  scrollWrap.appendChild(leftArrow); scrollWrap.appendChild(scroll); scrollWrap.appendChild(rightArrow);
+  block.appendChild(scrollWrap);
   // add row button
   const ab=document.createElement('div'); ab.className='sec-add-bar';
   ab.innerHTML=`<button class="ic-btn btn-add" onclick="addProduct('${retailer}','${secName}')">+ Add Product</button>`;
