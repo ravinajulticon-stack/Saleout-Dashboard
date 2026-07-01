@@ -624,9 +624,9 @@ async function saveToSupabase(){
 
     for(const [rName, rd] of Object.entries(EDIT)){
       const rId = rName.toLowerCase().replace(/[^a-z0-9]/g,'_');
-      for(const [secName, sec] of Object.entries(rd.sections)){
+      let secIdx=0; for(const [secName, sec] of Object.entries(rd.sections)){
         const secId = rId+'__'+secName.toLowerCase().replace(/[^a-z0-9]/g,'_');
-        allSections.push({ id:secId, retailer_id:rId, name:secName, total:sec.total });
+        allSections.push({ id:secId, retailer_id:rId, name:secName, total:sec.total, sort_order:secIdx });
         sec.products.forEach((p,pIdx)=>{
           if(!p.id){
             // Generate stable ID using full string hash (no truncation)
@@ -640,6 +640,7 @@ async function saveToSupabase(){
             allSales.push({ id:p.id+'__'+wi, product_id:p.id, week_label:WEEK_HEADERS[wi]?.wk||'WK'+(27+wi), qty });
           });
         });
+        secIdx++;
       }
     }
 
@@ -685,7 +686,7 @@ async function loadFromSupabase(){
       return;
     }
 
-    const { data: sections }    = await sb.from('sections').select('*').limit(10000);
+    const { data: sections }    = await sb.from('sections').select('*').order('sort_order').limit(10000);
     const { data: products }    = await sb.from('products').select('*').limit(10000);
     // Paginate weekly_sales (Supabase free tier returns max 1000 rows per request)
     let weekly_sales = [], ws_from = 0, ws_done = false;
