@@ -768,12 +768,12 @@ function getWeekSlice(arr){return arr.slice(wkFrom,wkTo+1);}
 function getWeekLabels(){return WEEKS.slice(wkFrom,wkTo+1);}
 
 function getWeeklyTotals(retailer){
-  if(!EDIT[retailer])return new Array(26).fill(0);
-  const t=new Array(26).fill(0);
+  if(!EDIT[retailer])return new Array(WEEKS.length).fill(0);
+  const t=new Array(WEEKS.length).fill(0);
   Object.values(EDIT[retailer].sections).forEach(sec=>sec.products.forEach(p=>p.weekly.forEach((v,i)=>t[i]+=(v||0))));
   return t;
 }
-function getCombinedWeekly(){const c=new Array(26).fill(0);getRetailers().forEach(r=>getWeeklyTotals(r).forEach((v,i)=>c[i]+=v));return c;}
+function getCombinedWeekly(){const c=new Array(WEEKS.length).fill(0);getRetailers().forEach(r=>getWeeklyTotals(r).forEach((v,i)=>c[i]+=v));return c;}
 
 function getAllProducts(){
   const out=[];
