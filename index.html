@@ -706,6 +706,7 @@ async function loadFromSupabase(){
       WEEKS.length = 0;
       WEEK_HEADERS.forEach(h => WEEKS.push(h.wk));
       wkTo = WEEKS.length - 1;
+      wkFrom = 0;
     }
 
     // Rebuild EDIT
@@ -798,17 +799,11 @@ function getSections(){const s=new Set();getRetailers().forEach(r=>Object.keys(E
 const selFrom=document.getElementById('wkFrom'),selTo=document.getElementById('wkTo');
 
 function refreshWeekSelects(){
-  // remember current selections by label
-  const fromLabel = WEEKS[wkFrom];
-  const toLabel   = WEEKS[wkTo];
   selFrom.innerHTML = '';
   selTo.innerHTML   = '';
   WEEKS.forEach((w,i)=>{ selFrom.add(new Option(w,i)); selTo.add(new Option(w,i)); });
-  // restore selection — default to last week for "to" if a new one was added
-  const newFromIdx = WEEKS.indexOf(fromLabel);
-  const newToIdx   = WEEKS.indexOf(toLabel);
-  wkFrom = newFromIdx !== -1 ? newFromIdx : 0;
-  wkTo   = newToIdx   !== -1 ? newToIdx   : WEEKS.length - 1;
+  wkFrom = 0;
+  wkTo   = WEEKS.length - 1;
   selFrom.value = wkFrom;
   selTo.value   = wkTo;
 }
