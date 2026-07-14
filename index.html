@@ -545,10 +545,10 @@ body {
         </div>
       </div>
       <div class="card">
-        <div class="card-header"><span class="card-title" id="catTitle">Category Mix</span></div>
+        <div class="card-header"><span class="card-title" id="typeChartTitle">Sales by Product Type</span></div>
         <div class="card-body">
-          <div class="chart-wrap"><canvas id="catChart"></canvas></div>
-          <div id="catLegend" style="margin-top:14px;display:flex;flex-direction:column;gap:4px"></div>
+          <div id="typePills" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px"></div>
+          <div class="chart-wrap"><canvas id="typeChart"></canvas></div>
         </div>
       </div>
     </div>
@@ -824,7 +824,7 @@ const tabsEl=document.getElementById('retailerTabs');
   const b=document.createElement('button');
   b.className='pill'+(r==='All'?' active':'');
   b.textContent=r;
-  b.onclick=()=>{activeRetailer=r;document.querySelectorAll('.pill').forEach(t=>t.classList.remove('active'));b.classList.add('active');renderAll();};
+  b.onclick=()=>{activeRetailer=r;activeType='ALL';document.querySelectorAll('.pill').forEach(t=>t.classList.remove('active'));b.classList.add('active');renderAll();};
   tabsEl.appendChild(b);
 });
 
@@ -915,18 +915,90 @@ function renderProducts(){
   }).join('');
 }
 
-/* ── category chart ── */
-let catChart;
-function renderCat(){
-  document.getElementById('catTitle').textContent=`Category Mix — ${activeRetailer}`;
-  const cats=getCatTotals();
-  const labels=Object.keys(cats),vals=Object.values(cats),colors=labels.map(l=>SEC_COLORS[l]||'#6e6e73');
-  const ctx=document.getElementById('catChart').getContext('2d');
-  if(catChart)catChart.destroy();
-  catChart=new Chart(ctx,{type:'doughnut',data:{labels,datasets:[{data:vals,backgroundColor:colors,borderWidth:2,borderColor:'#2c2c2e',hoverOffset:5}]},options:{responsive:true,maintainAspectRatio:false,cutout:'70%',plugins:{legend:{display:false},tooltip:{backgroundColor:'rgba(44,44,46,0.95)',titleColor:'#f5f5f7',bodyColor:'#aeaeb2',borderColor:'rgba(255,255,255,0.1)',borderWidth:1,cornerRadius:8,callbacks:{label:ctx=>` ${ctx.label.replace(' SOLD','')}: ${ctx.parsed.toLocaleString()}`}}}}});
-  const total=vals.reduce((a,b)=>a+b,0);
-  document.getElementById('catLegend').innerHTML=labels.map((l,i)=>`<div class="cat-leg-item"><div class="cat-dot" style="background:${colors[i]}"></div><div style="flex:1;color:var(--text-3)">${l.replace(' SOLD','')}</div><div style="font-weight:600;color:var(--text)">${vals[i]}</div><div style="color:var(--text-3);width:32px;text-align:right">${total>0?Math.round(vals[i]/total*100):0}%</div></div>`).join('');
+/* ── type chart ── */
+let typeChart, activeType='ALL';
+const TYPE_COLORS=['#0a84ff','#30d158','#ff9f0a','#ff453a','#bf5af2','#64d2ff','#ffd60a','#ff6961','#77dd77','#fdcae1','#aec6cf','#b39eb5'];
+
+function getTypeColor(type, allTypes){
+  const idx = allTypes.indexOf(type);
+  return TYPE_COLORS[idx % TYPE_COLORS.length];
 }
+
+function renderTypeChart(){
+  document.getElementById('typeChartTitle').textContent = `Sales by Product Type — ${activeRetailer}`;
+
+  // Collect all products visible for current retailer
+  const retailers = activeRetailer==='All' ? getRetailers() : [activeRetailer];
+  const allProds = [];
+  retailers.forEach(r => {
+    Object.values(EDIT[r]?.sections||{}).forEach(sec => {
+      sec.products.forEach(p => allProds.push({...p, retailer: r}));
+    });
+  });
+
+  // Get all unique types
+  const allTypes = [...new Set(allProds.map(p => p.type||'Unknown'))].sort();
+
+  // Render type filter pills
+  const pillsEl = document.getElementById('typePills');
+  pillsEl.innerHTML = ['ALL', ...allTypes].map(t => {
+    const active = activeType === t;
+    const color = t === 'ALL' ? 'var(--blue)' : getTypeColor(t, allTypes);
+    return `<button class="fp ${active?'active':''}" style="${active?`background:${color};border-color:${color};color:#fff`:''}" onclick="setActiveType('${t}')">${t}</button>`;
+  }).join('');
+
+  // Filter products by selected type
+  const filtered = activeType==='ALL' ? allProds : allProds.filter(p => (p.type||'Unknown')===activeType);
+
+  // Build datasets — one line per type (ALL mode) or one line per product (type selected)
+  const labels = getWeekLabels();
+  let datasets = [];
+
+  if(activeType === 'ALL'){
+    // One line per type
+    allTypes.forEach(type => {
+      const typeProds = filtered.filter(p => (p.type||'Unknown')===type);
+      const data = labels.map((wk,i) => {
+        const wkIdx = WEEKS.indexOf(wk);
+        return typeProds.reduce((sum, p) => sum + (p.weekly[wkIdx]||0), 0);
+      });
+      const color = getTypeColor(type, allTypes);
+      datasets.push({ label: type, data, borderColor: color, backgroundColor: color+'33', borderWidth: 2, pointRadius: 3, pointHoverRadius: 5, tension: 0.3, fill: false });
+    });
+  } else {
+    // One line per product within selected type
+    filtered.forEach((p, idx) => {
+      const data = labels.map((wk,i) => {
+        const wkIdx = WEEKS.indexOf(wk);
+        return p.weekly[wkIdx]||0;
+      });
+      const color = TYPE_COLORS[idx % TYPE_COLORS.length];
+      const label = filtered.length <= 8 ? p.name : p.name.substring(0,12);
+      datasets.push({ label, data, borderColor: color, backgroundColor: color+'33', borderWidth: 2, pointRadius: 3, pointHoverRadius: 5, tension: 0.3, fill: false });
+    });
+  }
+
+  const ctx = document.getElementById('typeChart').getContext('2d');
+  if(typeChart) typeChart.destroy();
+  typeChart = new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: true, position: 'top', labels: { color: '#aeaeb2', boxWidth: 12, font: { size: 11 } } },
+        tooltip: { backgroundColor: 'rgba(44,44,46,0.95)', titleColor: '#f5f5f7', bodyColor: '#aeaeb2', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1, cornerRadius: 8 }
+      },
+      scales: {
+        x: { ticks: { color: '#6e6e73', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.05)' } },
+        y: { ticks: { color: '#6e6e73', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.05)' }, beginAtZero: true }
+      }
+    }
+  });
+}
+
+function setActiveType(t){ activeType=t; renderTypeChart(); }
 
 /* ── sparklines ── */
 const sparkCharts={};
@@ -1489,7 +1561,7 @@ function renderDetail(){
 /* ── render all ── */
 function renderAll(){
   if(currentView==='overview'){
-    renderKpis();renderTrend();renderShare();renderPills();renderProducts();renderCat();renderSparks();
+    renderKpis();renderTrend();renderShare();renderPills();renderProducts();renderTypeChart();renderSparks();
   } else {
     renderDetail();
   }
