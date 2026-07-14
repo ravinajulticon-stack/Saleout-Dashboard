@@ -529,17 +529,23 @@ body {
     <!-- Trend + Share -->
     <div class="two-col">
       <div class="card">
-        <div class="card-header"><span class="card-title" id="trendTitle">Weekly Sales</span></div>
-        <div class="card-body"><div class="chart-wrap-tall"><canvas id="trendChart"></canvas></div></div>
-      </div>
-      <div class="card">
         <div class="card-header"><span class="card-title">Retailer Share</span></div>
         <div class="card-body" id="shareBars"></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title" id="trendTitle">Weekly Sales</span></div>
+        <div class="card-body"><div class="chart-wrap-tall"><canvas id="trendChart"></canvas></div></div>
       </div>
     </div>
 
     <!-- Products + Category -->
     <div class="two-col">
+      <div class="card">
+        <div class="card-header"><span class="card-title" id="typeChartTitle">Sales by Product Type</span></div>
+        <div class="card-body">
+          <div class="chart-wrap"><canvas id="typeChart"></canvas></div>
+        </div>
+      </div>
       <div class="card">
         <div class="card-header"><span class="card-title" id="prodTitle">Top Products</span></div>
         <div class="card-body">
@@ -550,12 +556,6 @@ body {
               <tbody id="prodTableBody"></tbody>
             </table>
           </div>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-header"><span class="card-title" id="typeChartTitle">Sales by Product Type</span></div>
-        <div class="card-body">
-          <div class="chart-wrap"><canvas id="typeChart"></canvas></div>
         </div>
       </div>
     </div>
