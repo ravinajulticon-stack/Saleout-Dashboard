@@ -369,6 +369,8 @@ body {
 .so-table thead th.col-total { color: var(--blue-light); }
 .so-table thead th.col-type { min-width: 100px; width: 100px; color: var(--text-2); }
 .so-table td.col-type { min-width: 100px; width: 100px; color: var(--text-2); font-size: 11px; }
+.so-table thead th.col-num { min-width: 36px; width: 36px; color: var(--text-3); text-align: center; }
+.so-table td.col-num { min-width: 36px; width: 36px; color: var(--text-3); font-size: 11px; text-align: center; }
 .so-table thead th.col-del { min-width: 36px; border-right: none; }
 
 .so-table tbody td {
@@ -1165,7 +1167,7 @@ function rebuildSectionTable(retailer, secName){
   const thead = document.querySelector(`#tb_${sid}`)?.closest('table')?.querySelector('thead tr');
   if(thead){
     const cols = getSecCols(retailer, secName);
-    let th = `<th class="col-name">Product</th><th class="col-type">Type</th><th class="col-total">Total</th>`;
+    let th = `<th class="col-num">#</th><th class="col-name">Product</th><th class="col-type">Type</th><th class="col-total">Total</th>`;
     cols.forEach((h,ci)=>{
       th += `<th style="min-width:80px;width:80px;">
         <div style="display:flex;align-items:center;justify-content:center;gap:3px">
@@ -1246,6 +1248,9 @@ function renderTbody(tbody, retailer, secName, secData, secColor){
     const sd=pos.length>1?Math.sqrt(pos.reduce((s,v)=>s+(v-mean)**2,0)/pos.length):0;
     const barPct=Math.round(Math.max(p.total,0)/maxProd*100);
     const tr=document.createElement('tr');
+    // number td
+    const numtd=document.createElement('td'); numtd.className='col-num';
+    numtd.textContent=pIdx+1; tr.appendChild(numtd);
     // name td
     const ntd=document.createElement('td'); ntd.className='col-name';
     ntd.innerHTML=`<div><span class="name-editable" contenteditable="true" spellcheck="false">${p.name}</span><span class="nano-bar"><span class="nano-fill" style="width:${barPct}%;background:${secColor}"></span></span></div>`;
@@ -1314,7 +1319,7 @@ function renderTbody(tbody, retailer, secName, secData, secColor){
   const wt=new Array(nCols).fill(0);
   prods.forEach(p=>{ const wk=p.weekly.slice(0,nCols); wk.forEach((v,i)=>wt[i]+=(v||0)); });
   const ttr=document.createElement('tr'); ttr.className='wk-total-row';
-  ttr.innerHTML=`<td class="col-name">Weekly Total</td><td class="col-type"></td><td class="col-total">${wt.reduce((a,b)=>a+b,0)||'—'}</td>`;
+  ttr.innerHTML=`<td class="col-num"></td><td class="col-name">Weekly Total</td><td class="col-type"></td><td class="col-total">${wt.reduce((a,b)=>a+b,0)||'—'}</td>`;
   wt.forEach(v=>{ const td=document.createElement('td'); td.textContent=v||'—'; ttr.appendChild(td); });
   const etd=document.createElement('td'); ttr.appendChild(etd);
   tbody.appendChild(ttr);
@@ -1332,7 +1337,7 @@ function buildSectionBlock(retailer, secName, secData, secColor){
   const scroll=document.createElement('div'); scroll.className='tbl-scroll';
   const tbl=document.createElement('table'); tbl.className='so-table';
   const cols0=getSecCols(retailer, secName);
-  let th=`<th class="col-name">Product</th><th class="col-type">Type</th><th class="col-total">Total</th>`;
+  let th=`<th class="col-num">#</th><th class="col-name">Product</th><th class="col-type">Type</th><th class="col-total">Total</th>`;
   cols0.forEach((h,ci)=>{
     th+=`<th style="min-width:80px;width:80px;">
       <div style="display:flex;align-items:center;justify-content:center;gap:3px">
