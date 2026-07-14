@@ -515,7 +515,7 @@ body {
       <option value="ALL">All Types</option>
     </select>
     <span class="wk-label" id="productFilterLabel" style="margin-left:10px;display:none">Product</span>
-    <select class="wk-sel" id="productFilterSel" style="min-width:130px;display:none" onchange="setActiveProduct(this.value)">
+    <select class="wk-sel" id="productFilterSel" style="min-width:130px;display:none">
       <option value="ALL">All Products</option>
     </select>
   </div>
@@ -829,6 +829,7 @@ function refreshWeekSelects(){
 refreshWeekSelects();
 selFrom.addEventListener('change',()=>{wkFrom=+selFrom.value;renderAll();});
 selTo.addEventListener('change',()=>{wkTo=+selTo.value;renderAll();});
+document.getElementById('productFilterSel').addEventListener('change', _onProductChange);
 
 /* ── retailer tabs ── */
 const tabsEl=document.getElementById('retailerTabs');
@@ -997,7 +998,9 @@ function renderTypeChart(){
       prodSel.innerHTML = '<option value="ALL">All Products</option>' + prodNames.map(n => `<option value="${n}">${n}</option>`).join('');
       // Only reset if current activeProduct isn't valid for this type
       if(!prodNames.includes(activeProduct)) activeProduct = 'ALL';
+      prodSel.removeEventListener('change', _onProductChange);
       prodSel.value = activeProduct;
+      prodSel.addEventListener('change', _onProductChange);
       prodSel.style.display = '';
       prodLabel.style.display = '';
     } else {
@@ -1101,9 +1104,10 @@ function renderTypeChart(){
 function setActiveProduct(p){
   activeProduct=p;
   const sel=document.getElementById('productFilterSel');
-  if(sel) sel.value=p;
+  if(sel){ sel.removeEventListener('change', _onProductChange); sel.value=p; sel.addEventListener('change', _onProductChange); }
   renderTypeChart();
 }
+function _onProductChange(){ setActiveProduct(this.value); }
 function setActiveSeries(s){ activeSeries=s; renderTypeChart(); }
 function setActiveBrand(b){
   activeBrand=b; activeType='ALL'; activeSeries='ALL'; activeProduct='ALL';
