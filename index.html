@@ -966,7 +966,7 @@ function renderTypeChart(){
   const rawTypes = [...new Set(brandFiltered.map(p => p.type||'Unknown'))].sort();
   const hasSafes = rawTypes.some(t => SAFE_SERIES.includes(t));
   const allTypes = rawTypes.filter(t => !SAFE_SERIES.includes(t));
-  if(hasSafes) allTypes.push('Philips Safes');
+  if(hasSafes) allTypes.push('Safes');
   allTypes.sort();
 
   // Populate type dropdown
@@ -981,7 +981,7 @@ function renderTypeChart(){
 
   // Handle series pills for Philips Safes
   const pillsEl = document.getElementById('seriesPills');
-  const isSafes = activeType === 'Philips Safes';
+  const isSafes = activeType === 'Safes';
   if(pillsEl){
     if(isSafes){
       const availSeries = rawTypes.filter(t => SAFE_SERIES.includes(t)).sort();
@@ -1031,7 +1031,7 @@ function renderTypeChart(){
   } else if(activeType === 'ALL'){
     // One line per type (including "Philips Safes" as a combined line)
     allTypes.forEach((type, idx) => {
-      const typeProds = type === 'Philips Safes'
+      const typeProds = type === 'Safes'
         ? brandFiltered.filter(p => SAFE_SERIES.includes(p.type||''))
         : filtered.filter(p => (p.type||'Unknown') === type);
       const data = labels.map(wk => { const i = WEEKS.indexOf(wk); return typeProds.reduce((s,p) => s+(p.weekly[i]||0), 0); });
