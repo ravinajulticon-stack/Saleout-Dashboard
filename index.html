@@ -506,6 +506,10 @@ body {
     <select class="wk-sel" id="wkFrom"></select>
     <span class="wk-label">to</span>
     <select class="wk-sel" id="wkTo"></select>
+    <span class="wk-label" style="margin-left:10px">Brand</span>
+    <select class="wk-sel" id="brandFilterSel" style="min-width:120px" onchange="setActiveBrand(this.value)">
+      <option value="ALL">All Brands</option>
+    </select>
     <span class="wk-label" style="margin-left:10px">Type</span>
     <select class="wk-sel" id="typeFilterSel" style="min-width:110px" onchange="setActiveType(this.value)">
       <option value="ALL">All Types</option>
@@ -827,7 +831,7 @@ const tabsEl=document.getElementById('retailerTabs');
   const b=document.createElement('button');
   b.className='pill'+(r==='All'?' active':'');
   b.textContent=r;
-  b.onclick=()=>{activeRetailer=r;activeType='ALL';document.querySelectorAll('.pill').forEach(t=>t.classList.remove('active'));b.classList.add('active');renderAll();};
+  b.onclick=()=>{activeRetailer=r;activeType='ALL';activeBrand='ALL';document.querySelectorAll('.pill').forEach(t=>t.classList.remove('active'));b.classList.add('active');renderAll();};
   tabsEl.appendChild(b);
 });
 
@@ -919,7 +923,7 @@ function renderProducts(){
 }
 
 /* ── type chart ── */
-let typeChart, activeType='ALL';
+let typeChart, activeType='ALL', activeBrand='ALL';
 const TYPE_COLORS=['#0a84ff','#30d158','#ff9f0a','#ff453a','#bf5af2','#64d2ff','#ffd60a','#ff6961','#77dd77','#fdcae1','#aec6cf','#b39eb5'];
 
 function getTypeColor(type, allTypes){
@@ -934,15 +938,29 @@ function renderTypeChart(){
   const retailers = activeRetailer==='All' ? getRetailers() : [activeRetailer];
   const allProds = [];
   retailers.forEach(r => {
-    Object.values(EDIT[r]?.sections||{}).forEach(sec => {
-      sec.products.forEach(p => allProds.push({...p, retailer: r}));
+    Object.entries(EDIT[r]?.sections||{}).forEach(([secName, sec]) => {
+      sec.products.forEach(p => allProds.push({...p, retailer: r, secName}));
     });
   });
 
-  // Get all unique types
-  const allTypes = [...new Set(allProds.map(p => p.type||'Unknown'))].sort();
+  // Get all unique brands (section names stripped of " SOLD")
+  const allBrands = [...new Set(allProds.map(p => p.secName.replace(' SOLD','')))].sort();
+
+  // Populate brand dropdown
+  const brandSel = document.getElementById('brandFilterSel');
+  if(brandSel){
+    const prevBrand = brandSel.value;
+    brandSel.innerHTML = '<option value="ALL">All Brands</option>' + allBrands.map(b => `<option value="${b}">${b}</option>`).join('');
+    brandSel.value = allBrands.includes(prevBrand) ? prevBrand : 'ALL';
+    if(brandSel.value !== activeBrand) activeBrand = brandSel.value;
+  }
+
+  // Filter by brand first, then type
+  const brandFiltered = activeBrand==='ALL' ? allProds : allProds.filter(p => p.secName.replace(' SOLD','')=== activeBrand);
+  const filtered = activeType==='ALL' ? brandFiltered : brandFiltered.filter(p => (p.type||'Unknown')===activeType);
 
   // Populate type dropdown
+  const allTypes = [...new Set(brandFiltered.map(p => p.type||'Unknown'))].sort();
   const sel = document.getElementById('typeFilterSel');
   if(sel){
     const prev = sel.value;
@@ -950,9 +968,6 @@ function renderTypeChart(){
     sel.value = allTypes.includes(prev) ? prev : 'ALL';
     if(sel.value !== activeType) activeType = sel.value;
   }
-
-  // Filter products by selected type
-  const filtered = activeType==='ALL' ? allProds : allProds.filter(p => (p.type||'Unknown')===activeType);
 
   // Build datasets — one line per type (ALL mode) or one line per product (type selected)
   const labels = getWeekLabels();
@@ -1002,6 +1017,13 @@ function renderTypeChart(){
   });
 }
 
+function setActiveBrand(b){
+  activeBrand=b;
+  activeType='ALL';
+  const sel=document.getElementById('typeFilterSel');
+  if(sel) sel.value='ALL';
+  renderTypeChart();
+}
 function setActiveType(t){
   activeType=t;
   const sel=document.getElementById('typeFilterSel');
