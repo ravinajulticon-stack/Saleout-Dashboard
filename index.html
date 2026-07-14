@@ -1756,7 +1756,7 @@ function renderRetailerBlock(container, retailer){
   const color=COLORS[rIdx]||'#0a84ff';
   if(activeRetailer==='All'){
     const h=document.createElement('div'); h.className='ret-heading';
-    h.innerHTML=`<span class="ret-heading-name" style="color:${color}">${retailer}</span><div class="ret-heading-right"><span class="ret-total-badge" style="background:${color}">${rd.total.toLocaleString()}</span><button class="ic-btn btn-add" onclick="addSection('${retailer}')">+ Section</button></div>`;
+    h.innerHTML=`<span class="ret-heading-name" style="color:${color}">${retailer}</span><div class="ret-heading-right"><span class="ret-total-badge" style="background:${color}">${Object.values(rd.sections||{}).reduce((s,sec)=>s+sec.products.reduce((ps,p)=>ps+p.weekly.reduce((a,b)=>a+(b>0?b:0),0),0),0).toLocaleString()}</span><button class="ic-btn btn-add" onclick="addSection('${retailer}')">+ Section</button></div>`;
     container.appendChild(h);
   }
   Object.entries(rd.sections).forEach(([secName,secData])=>{
