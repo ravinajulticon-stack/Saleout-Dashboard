@@ -552,7 +552,7 @@ body {
           <div class="filter-pills" id="sectionPills"></div>
           <div class="prod-scroll">
             <table class="ptable">
-              <thead><tr><th>Product</th><th>Category</th><th>Retailer</th><th></th><th style="text-align:right">Units</th></tr></thead>
+              <thead><tr><th>Product</th><th>Brand</th><th>Retailer</th><th></th><th style="text-align:right">Units</th></tr></thead>
               <tbody id="prodTableBody"></tbody>
             </table>
           </div>
@@ -911,10 +911,10 @@ function renderProducts(){
   document.getElementById('prodTableBody').innerHTML=prods.map(p=>{
     const pct=Math.round(p.total/max*100);
     const c=SEC_COLORS[p.section]||'#6e6e73';
-    const cat=p.section.replace(' SOLD','').replace('PHILIPS ','').replace('SAMSUNG ','').replace('DDL & ZIG ','DDL/Zig ');
+    const brand=p.section.replace(' SOLD','');
     return `<tr>
       <td><span class="pname">${p.name}</span></td>
-      <td><span style="font-size:10px;font-weight:600;color:${c}">${cat}</span></td>
+      <td><span style="font-size:10px;font-weight:600;color:${c}">${brand}</span></td>
       <td><span style="font-size:10px;color:var(--text-3)">${p.retailer}</span></td>
       <td><div class="pbar-wrap"><div class="pbar-fill" style="width:${pct}%;background:${c}"></div></div></td>
       <td class="pnum" style="color:${c}">${p.total}</td>
