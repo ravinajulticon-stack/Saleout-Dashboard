@@ -506,6 +506,10 @@ body {
     <select class="wk-sel" id="wkFrom"></select>
     <span class="wk-label">to</span>
     <select class="wk-sel" id="wkTo"></select>
+    <span class="wk-label" style="margin-left:10px">Type</span>
+    <select class="wk-sel" id="typeFilterSel" style="min-width:110px" onchange="setActiveType(this.value)">
+      <option value="ALL">All Types</option>
+    </select>
   </div>
 </div>
 
@@ -547,7 +551,6 @@ body {
       <div class="card">
         <div class="card-header"><span class="card-title" id="typeChartTitle">Sales by Product Type</span></div>
         <div class="card-body">
-          <div id="typePills" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px"></div>
           <div class="chart-wrap"><canvas id="typeChart"></canvas></div>
         </div>
       </div>
@@ -939,13 +942,14 @@ function renderTypeChart(){
   // Get all unique types
   const allTypes = [...new Set(allProds.map(p => p.type||'Unknown'))].sort();
 
-  // Render type filter pills
-  const pillsEl = document.getElementById('typePills');
-  pillsEl.innerHTML = ['ALL', ...allTypes].map(t => {
-    const active = activeType === t;
-    const color = t === 'ALL' ? 'var(--blue)' : getTypeColor(t, allTypes);
-    return `<button class="fp ${active?'active':''}" style="${active?`background:${color};border-color:${color};color:#fff`:''}" onclick="setActiveType('${t}')">${t}</button>`;
-  }).join('');
+  // Populate type dropdown
+  const sel = document.getElementById('typeFilterSel');
+  if(sel){
+    const prev = sel.value;
+    sel.innerHTML = '<option value="ALL">All Types</option>' + allTypes.map(t => `<option value="${t}">${t}</option>`).join('');
+    sel.value = allTypes.includes(prev) ? prev : 'ALL';
+    if(sel.value !== activeType) activeType = sel.value;
+  }
 
   // Filter products by selected type
   const filtered = activeType==='ALL' ? allProds : allProds.filter(p => (p.type||'Unknown')===activeType);
@@ -998,7 +1002,12 @@ function renderTypeChart(){
   });
 }
 
-function setActiveType(t){ activeType=t; renderTypeChart(); }
+function setActiveType(t){
+  activeType=t;
+  const sel=document.getElementById('typeFilterSel');
+  if(sel) sel.value=t;
+  renderTypeChart();
+}
 
 /* ── sparklines ── */
 const sparkCharts={};
