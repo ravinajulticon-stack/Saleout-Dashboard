@@ -959,8 +959,8 @@ function renderTypeChart(){
   if(brandSel){
     const prevBrand = brandSel.value;
     brandSel.innerHTML = '<option value="ALL">All Brands</option>' + allBrands.map(b => `<option value="${b}">${b}</option>`).join('');
-    brandSel.value = allBrands.includes(prevBrand) ? prevBrand : 'ALL';
-    if(brandSel.value !== activeBrand) activeBrand = brandSel.value;
+    if(!allBrands.includes(activeBrand)) activeBrand = 'ALL';
+    brandSel.value = activeBrand;
   }
 
   // Filter by brand first
@@ -976,11 +976,9 @@ function renderTypeChart(){
   // Populate type dropdown
   const sel = document.getElementById('typeFilterSel');
   if(sel){
-    const prev = sel.value;
     sel.innerHTML = '<option value="ALL">All Types</option>' + allTypes.map(t => `<option value="${t}">${t}</option>`).join('');
-    const validPrev = allTypes.includes(prev) ? prev : 'ALL';
-    sel.value = validPrev;
-    if(sel.value !== activeType) activeType = sel.value;
+    if(!allTypes.includes(activeType) && activeType !== 'ALL') activeType = 'ALL';
+    sel.value = activeType;
   }
 
   // Handle pills — series for Safes, products for lock types
