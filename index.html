@@ -545,12 +545,20 @@ body {
       </div>
     </div>
 
-    <!-- Share + Products -->
+    <!-- WoW Growth + Top 5 This Week -->
     <div class="two-col">
       <div class="card">
-        <div class="card-header"><span class="card-title">Retailer Share</span></div>
-        <div class="card-body" id="shareBars"></div>
+        <div class="card-header"><span class="card-title" id="wowTitle">Week-on-Week Growth</span></div>
+        <div class="card-body" id="wowBars"></div>
       </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title" id="top5Title">Top 5 Products This Week</span></div>
+        <div class="card-body" id="top5Bars"></div>
+      </div>
+    </div>
+
+    <!-- Top Products + Slow Movers -->
+    <div class="two-col">
       <div class="card">
         <div class="card-header"><span class="card-title" id="prodTitle">Top Products</span></div>
         <div class="card-body">
@@ -562,6 +570,10 @@ body {
             </table>
           </div>
         </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">Slow / No Movement <span style="font-size:11px;color:var(--text-3);font-weight:400">— last 4 weeks</span></span></div>
+        <div class="card-body" id="slowMovers"></div>
       </div>
     </div>
 
@@ -813,7 +825,108 @@ function getCatTotals(){
 }
 function getSections(){const s=new Set();getRetailers().forEach(r=>Object.keys(EDIT[r]?EDIT[r].sections:{}).forEach(k=>s.add(k)));return Array.from(s);}
 
-/* ── week selects ── */
+/* ── Week-on-Week Growth ── */
+function renderWoW(){
+  document.getElementById('wowTitle').textContent = `Week-on-Week Growth — ${activeRetailer}`;
+  const rets = getRetailers();
+  const lastIdx = wkTo;
+  const prevIdx = wkTo - 1;
+  if(prevIdx < 0){ document.getElementById('wowBars').innerHTML='<div style="color:var(--text-3);font-size:12px;padding:8px">Not enough weeks selected.</div>'; return; }
+  const rows = rets.map(r => {
+    const wk = getWeeklyTotals(r);
+    const curr = wk[lastIdx]||0;
+    const prev = wk[prevIdx]||0;
+    const pct = prev===0 ? null : Math.round((curr-prev)/prev*100);
+    return { r, curr, prev, pct };
+  }).sort((a,b) => (b.pct??-999)-(a.pct??-999));
+  const COLORS = {'Bunnings':'#0a84ff','Bing Lee':'#30d158','Harvey Norman':'#ff9f0a','Website':'#ff453a','JB Hi-Fi':'#bf5af2','Amazon':'#64d2ff'};
+  document.getElementById('wowBars').innerHTML = rows.map(({r,curr,prev,pct})=>{
+    const color = COLORS[r]||'#6e6e73';
+    const arrow = pct===null?'—':pct>0?`▲ ${pct}%`:pct<0?`▼ ${Math.abs(pct)}%`:'→ 0%';
+    const arrowColor = pct===null?'var(--text-3)':pct>0?'#30d158':pct<0?'#ff453a':'var(--text-3)';
+    const barW = Math.min(Math.abs(pct||0),100);
+    return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+      <div style="width:110px;font-size:12px;color:var(--text-2);flex-shrink:0">${r}</div>
+      <div style="flex:1;background:var(--surface-1);border-radius:4px;height:8px;overflow:hidden">
+        <div style="width:${barW}%;height:100%;background:${pct>=0?'#30d158':'#ff453a'};border-radius:4px;transition:width 0.3s"></div>
+      </div>
+      <div style="width:60px;text-align:right;font-size:12px;font-weight:600;color:${arrowColor}">${arrow}</div>
+      <div style="width:70px;text-align:right;font-size:11px;color:var(--text-3)">${prev}→${curr}</div>
+    </div>`;
+  }).join('');
+}
+
+/* ── Top 5 Products This Week ── */
+function renderTop5(){
+  const latestWk = WEEKS[wkTo];
+  document.getElementById('top5Title').textContent = `Top 5 Products — ${latestWk}`;
+  const rets = getRetailers();
+  const prodMap = {};
+  rets.forEach(r => {
+    Object.values(EDIT[r]?.sections||{}).forEach(sec => {
+      sec.products.forEach(p => {
+        const qty = p.weekly[wkTo]||0;
+        if(qty > 0){
+          if(!prodMap[p.name]) prodMap[p.name] = { name:p.name, qty:0 };
+          prodMap[p.name].qty += qty;
+        }
+      });
+    });
+  });
+  const top5 = Object.values(prodMap).sort((a,b)=>b.qty-a.qty).slice(0,5);
+  const maxQ = top5[0]?.qty||1;
+  document.getElementById('top5Bars').innerHTML = top5.length===0
+    ? '<div style="color:var(--text-3);font-size:12px;padding:8px">No data for this week.</div>'
+    : top5.map((p,i)=>{
+      const colors = ['#0a84ff','#30d158','#ff9f0a','#bf5af2','#ff453a'];
+      const pct = Math.round(p.qty/maxQ*100);
+      return `<div style="margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+          <span style="font-size:12px;color:var(--text-2)">${i+1}. ${p.name}</span>
+          <span style="font-size:12px;font-weight:600;color:${colors[i]}">${p.qty}</span>
+        </div>
+        <div style="background:var(--surface-1);border-radius:4px;height:6px">
+          <div style="width:${pct}%;height:100%;background:${colors[i]};border-radius:4px;transition:width 0.3s"></div>
+        </div>
+      </div>`;
+    }).join('');
+}
+
+/* ── Slow / No Movement ── */
+function renderSlowMovers(){
+  const rets = getRetailers();
+  const lookback = 4;
+  const startIdx = Math.max(0, wkTo - lookback + 1);
+  const slow = [];
+  rets.forEach(r => {
+    Object.entries(EDIT[r]?.sections||{}).forEach(([secName, sec]) => {
+      sec.products.forEach(p => {
+        const recentQty = p.weekly.slice(startIdx, wkTo+1).reduce((a,b)=>a+(b||0),0);
+        if(recentQty === 0 && p.total > 0) {
+          slow.push({ name:p.name, retailer:r, brand: secName.replace(' SOLD',''), total:p.total });
+        }
+      });
+    });
+  });
+  slow.sort((a,b) => b.total - a.total);
+  const el = document.getElementById('slowMovers');
+  if(slow.length===0){
+    el.innerHTML = '<div style="color:#30d158;font-size:12px;padding:8px">✓ All products moving in the last 4 weeks.</div>';
+    return;
+  }
+  el.innerHTML = `<div style="font-size:11px;color:var(--text-3);margin-bottom:8px">${slow.length} product${slow.length>1?'s':''} with no sales in last 4 weeks</div>`
+    + `<div style="max-height:180px;overflow-y:auto">`
+    + slow.slice(0,20).map(p=>`
+      <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:0.5px solid var(--border)">
+        <div style="flex:1;font-size:12px;color:var(--text-2)">${p.name}</div>
+        <div style="font-size:11px;color:var(--text-3);white-space:nowrap">${p.brand.replace('PHILIPS ','').replace('ZIGBANG ','ZB ')}</div>
+        <div style="font-size:11px;color:var(--text-3);white-space:nowrap">${p.retailer.substring(0,2).toUpperCase()}</div>
+        <div style="font-size:11px;color:#ff9f0a;width:40px;text-align:right">${p.total} tot</div>
+      </div>`).join('')
+    + '</div>';
+}
+
+
 const selFrom=document.getElementById('wkFrom'),selTo=document.getElementById('wkTo');
 
 function refreshWeekSelects(){
@@ -1676,7 +1789,7 @@ function renderDetail(){
 /* ── render all ── */
 function renderAll(){
   if(currentView==='overview'){
-    renderKpis();renderTrend();renderShare();renderPills();renderProducts();renderTypeChart();renderSparks();
+    renderKpis();renderTrend();renderPills();renderProducts();renderTypeChart();renderSparks();renderWoW();renderTop5();renderSlowMovers();
   } else {
     renderDetail();
   }
