@@ -637,7 +637,7 @@ async function saveToSupabase(){
             for(let i=0;i<raw.length;i++){ h = Math.imul(31,h)+raw.charCodeAt(i)|0; }
             p.id = 'p_' + Math.abs(h).toString(36) + '_' + raw.slice(0,12);
           }
-          allProducts.push({ id:p.id, section_id:secId, retailer_id:rId, name:p.name, total:p.total, sort_order:pIdx });
+          allProducts.push({ id:p.id, section_id:secId, retailer_id:rId, name:p.name, type:p.type||'', total:p.total, sort_order:pIdx });
           p.weekly.forEach((qty,wi)=>{
             allSales.push({ id:p.id+'__'+wi, product_id:p.id, week_label:WEEK_HEADERS[wi]?.wk||'WK'+(27+wi), qty });
           });
@@ -1255,7 +1255,17 @@ function renderTbody(tbody, retailer, secName, secData, secColor){
     tr.appendChild(ntd);
     // type td
     const typetd=document.createElement('td'); typetd.className='col-type';
-    typetd.textContent=p.type||'—'; tr.appendChild(typetd);
+    const te=document.createElement('span'); te.className='name-editable'; te.contentEditable='true'; te.spellcheck=false;
+    te.textContent=p.type||'';
+    te.addEventListener('focus',()=>te.style.borderBottomColor='var(--blue)');
+    te.addEventListener('blur',()=>{
+      te.style.borderBottomColor='transparent';
+      const v=te.textContent.trim();
+      EDIT[retailer].sections[secName].products[pIdx].type=v;
+      debouncedSave();
+    });
+    te.addEventListener('keydown',(e)=>{ if(e.key==='Enter'){e.preventDefault();te.blur();} if(e.key==='Escape'){te.textContent=p.type||'';te.blur();} });
+    typetd.appendChild(te); tr.appendChild(typetd);
     // total td
     const ttd=document.createElement('td'); ttd.className='col-total';
     ttd.textContent=p.total!==0?p.total:'—'; tr.appendChild(ttd);
