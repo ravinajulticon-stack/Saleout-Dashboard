@@ -1265,7 +1265,7 @@ function renderSparks(){
       <div class="spark-top">
         <div style="min-width:0;flex:1;overflow:hidden">
           <div class="spark-name">${r}</div>
-          <div class="spark-total" style="color:${COLORS[i]}">${(EDIT[r]?EDIT[r].total:0).toLocaleString()}</div>
+          <div class="spark-total" style="color:${COLORS[i]}">${Object.values(EDIT[r]?.sections||{}).reduce((s,sec)=>s+sec.products.reduce((ps,p)=>ps+p.weekly.slice(wkFrom,wkTo+1).reduce((a,b)=>a+(b>0?b:0),0),0),0).toLocaleString()}</div>
         </div>
         <div class="spark-peak">
           <div class="spark-peak-val" style="color:${COLORS[i]}">${peak}</div>
