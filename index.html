@@ -1785,10 +1785,11 @@ function renderDetail(){
   const rets=isAll?Object.keys(EDIT):[activeRetailer];
   if(isAll){
     document.getElementById('detailRetailerName').textContent='All Retailers';
-    document.getElementById('detailTotalBadge').textContent=Object.values(EDIT).reduce((s,r)=>s+r.total,0).toLocaleString();
+    document.getElementById('detailTotalBadge').textContent=Object.values(EDIT).reduce((s,rd)=>s+Object.values(rd.sections||{}).reduce((ss,sec)=>ss+sec.products.reduce((ps,p)=>ps+p.weekly.reduce((a,b)=>a+(b>0?b:0),0),0),0),0).toLocaleString();
   } else {
     document.getElementById('detailRetailerName').textContent=activeRetailer;
-    document.getElementById('detailTotalBadge').textContent=(EDIT[activeRetailer]?.total||0).toLocaleString();
+    const _rd=EDIT[activeRetailer];
+    document.getElementById('detailTotalBadge').textContent=Object.values(_rd?.sections||{}).reduce((s,sec)=>s+sec.products.reduce((ps,p)=>ps+p.weekly.reduce((a,b)=>a+(b>0?b:0),0),0),0).toLocaleString();
   }
   rets.forEach(r=>renderRetailerBlock(container,r));
   const bb=document.createElement('div'); bb.className='bottom-bar';
