@@ -180,7 +180,7 @@ body {
 .card-body  { padding: 14px 18px 18px; }
 
 /* ── KPI STRIP ── */
-.kpi-strip { display: grid; grid-template-columns: repeat(6,1fr); gap: 1px; background: var(--border); border-radius: var(--radius-lg); overflow: hidden; border: 1px solid var(--border); }
+.kpi-strip { display: grid; grid-template-columns: repeat(7,1fr); gap: 1px; background: var(--border); border-radius: var(--radius-lg); overflow: hidden; border: 1px solid var(--border); }
 .kpi-item  { background: var(--surface-1); padding: 16px 18px; }
 .kpi-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text-3); margin-bottom: 6px; }
 .kpi-val   { font-size: 26px; font-weight: 700; letter-spacing: -1px; line-height: 1; color: var(--text); }
@@ -188,8 +188,8 @@ body {
 .kpi-val.green  { color: var(--green); }
 .kpi-val.amber  { color: var(--amber); }
 .kpi-sub   { font-size: 10px; color: var(--text-3); margin-top: 5px; }
-@media(max-width:1000px){ .kpi-strip { grid-template-columns: repeat(3,1fr); } }
-@media(max-width:600px){ .kpi-strip { grid-template-columns: repeat(2,1fr); } }
+@media(max-width:1100px){ .kpi-strip { grid-template-columns: repeat(4,1fr); } }
+@media(max-width:700px){ .kpi-strip { grid-template-columns: repeat(2,1fr); } }
 
 /* ── TWO COL ── */
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
@@ -853,12 +853,13 @@ function renderKpis(){
   const avg=wkSlice.length?Math.round(wkSlice.reduce((a,b)=>a+b,0)/wkSlice.length):0;
   const peak=Math.max(...wkSlice,0);
   const peakWk=WEEKS[wkFrom+wkSlice.indexOf(peak)]||'';
-  let plocks=0,psafes=0,other=0;
+  let plocks=0,psafes=0,ddl=0,zigbang=0;
   rets.forEach(r=>Object.entries(EDIT[r]?EDIT[r].sections:{}).forEach(([sec,sd])=>{
     const t=sd.products.filter(p=>p.total>0).reduce((s,p)=>s+p.total,0);
     if(sec.includes('PHILIPS LOCKS'))plocks+=t;
     else if(sec.includes('SAFES'))psafes+=t;
-    else other+=t;
+    else if(sec.includes('ZIGBANG'))zigbang+=t;
+    else ddl+=t;
   }));
   document.getElementById('kpiStrip').innerHTML=`
     <div class="kpi-item"><div class="kpi-label">Total Units</div><div class="kpi-val blue">${grand.toLocaleString()}</div><div class="kpi-sub">${activeRetailer==='All'?'6 retailers':activeRetailer}</div></div>
@@ -866,7 +867,8 @@ function renderKpis(){
     <div class="kpi-item"><div class="kpi-label">Peak Week</div><div class="kpi-val green">${peak.toLocaleString()}</div><div class="kpi-sub">${peakWk}</div></div>
     <div class="kpi-item"><div class="kpi-label">Philips Locks</div><div class="kpi-val">${plocks.toLocaleString()}</div><div class="kpi-sub">${grand>0?Math.round(plocks/grand*100):0}% of total</div></div>
     <div class="kpi-item"><div class="kpi-label">Philips Safes</div><div class="kpi-val">${psafes.toLocaleString()}</div><div class="kpi-sub">safe range</div></div>
-    <div class="kpi-item"><div class="kpi-label">DDL / Zigbang</div><div class="kpi-val amber">${other.toLocaleString()}</div><div class="kpi-sub">multi-brand</div></div>`;
+    <div class="kpi-item"><div class="kpi-label">DDL Locks</div><div class="kpi-val amber">${ddl.toLocaleString()}</div><div class="kpi-sub">multi-brand</div></div>
+    <div class="kpi-item"><div class="kpi-label">Zigbang Locks</div><div class="kpi-val" style="color:#bf5af2">${zigbang.toLocaleString()}</div><div class="kpi-sub">multi-brand</div></div>`;
 }
 
 /* ── trend chart ── */
