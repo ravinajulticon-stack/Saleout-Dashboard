@@ -535,6 +535,7 @@ body {
       <div class="card">
         <div class="card-header"><span class="card-title" id="typeChartTitle">Sales by Product Type</span></div>
         <div class="card-body">
+          <div id="seriesPills" style="display:none;flex-wrap:wrap;gap:6px;margin-bottom:10px;"></div>
           <div class="chart-wrap-tall"><canvas id="typeChart"></canvas></div>
         </div>
       </div>
@@ -831,7 +832,7 @@ const tabsEl=document.getElementById('retailerTabs');
   const b=document.createElement('button');
   b.className='pill'+(r==='All'?' active':'');
   b.textContent=r;
-  b.onclick=()=>{activeRetailer=r;activeType='ALL';activeBrand='ALL';document.querySelectorAll('.pill').forEach(t=>t.classList.remove('active'));b.classList.add('active');renderAll();};
+  b.onclick=()=>{activeRetailer=r;activeType='ALL';activeBrand='ALL';activeSeries='ALL';document.querySelectorAll('.pill').forEach(t=>t.classList.remove('active'));b.classList.add('active');renderAll();};
   tabsEl.appendChild(b);
 });
 
@@ -925,7 +926,8 @@ function renderProducts(){
 }
 
 /* ── type chart ── */
-let typeChart, activeType='ALL', activeBrand='ALL';
+let typeChart, activeType='ALL', activeBrand='ALL', activeSeries='ALL';
+const SAFE_SERIES = ['0000 Series','1000 Series','2000 Series','3000 Series','5000 Series','6000 Series','7000 Series'];
 const TYPE_COLORS=['#0a84ff','#30d158','#ff9f0a','#ff453a','#bf5af2','#64d2ff','#ffd60a','#ff6961','#77dd77','#fdcae1','#aec6cf','#b39eb5'];
 
 function getTypeColor(type, allTypes){
@@ -957,49 +959,93 @@ function renderTypeChart(){
     if(brandSel.value !== activeBrand) activeBrand = brandSel.value;
   }
 
-  // Filter by brand first, then type
+  // Filter by brand first
   const brandFiltered = activeBrand==='ALL' ? allProds : allProds.filter(p => p.secName.replace(' SOLD','')=== activeBrand);
-  const filtered = activeType==='ALL' ? brandFiltered : brandFiltered.filter(p => (p.type||'Unknown')===activeType);
+
+  // Get unique types — group all safe series under "Philips Safes"
+  const rawTypes = [...new Set(brandFiltered.map(p => p.type||'Unknown'))].sort();
+  const hasSafes = rawTypes.some(t => SAFE_SERIES.includes(t));
+  const allTypes = rawTypes.filter(t => !SAFE_SERIES.includes(t));
+  if(hasSafes) allTypes.push('Philips Safes');
+  allTypes.sort();
 
   // Populate type dropdown
-  const allTypes = [...new Set(brandFiltered.map(p => p.type||'Unknown'))].sort();
   const sel = document.getElementById('typeFilterSel');
   if(sel){
     const prev = sel.value;
     sel.innerHTML = '<option value="ALL">All Types</option>' + allTypes.map(t => `<option value="${t}">${t}</option>`).join('');
-    sel.value = allTypes.includes(prev) ? prev : 'ALL';
+    const validPrev = allTypes.includes(prev) ? prev : 'ALL';
+    sel.value = validPrev;
     if(sel.value !== activeType) activeType = sel.value;
   }
 
-  // Build datasets — one line per type (ALL mode) or one line per product (type selected)
+  // Handle series pills for Philips Safes
+  const pillsEl = document.getElementById('seriesPills');
+  const isSafes = activeType === 'Philips Safes';
+  if(pillsEl){
+    if(isSafes){
+      const availSeries = rawTypes.filter(t => SAFE_SERIES.includes(t)).sort();
+      pillsEl.style.display = 'flex';
+      pillsEl.innerHTML = ['ALL', ...availSeries].map(s => {
+        const active = activeSeries === s;
+        const label = s === 'ALL' ? 'All series' : s;
+        return `<button class="fp ${active?'active':''}" style="font-size:11px;padding:3px 10px;" onclick="setActiveSeries('${s}')">${label}</button>`;
+      }).join('');
+    } else {
+      pillsEl.style.display = 'none';
+      activeSeries = 'ALL';
+    }
+  }
+
+  // Filter products
+  let filtered;
+  if(isSafes){
+    const seriesFiltered = brandFiltered.filter(p => SAFE_SERIES.includes(p.type||''));
+    filtered = activeSeries === 'ALL' ? seriesFiltered : seriesFiltered.filter(p => p.type === activeSeries);
+  } else {
+    filtered = activeType === 'ALL' ? brandFiltered : brandFiltered.filter(p => (p.type||'Unknown') === activeType);
+  }
+
+  // Build datasets
   const labels = getWeekLabels();
   let datasets = [];
 
-  if(activeType === 'ALL'){
-    // One line per type
-    allTypes.forEach(type => {
-      const typeProds = filtered.filter(p => (p.type||'Unknown')===type);
-      const data = labels.map((wk,i) => {
-        const wkIdx = WEEKS.indexOf(wk);
-        return typeProds.reduce((sum, p) => sum + (p.weekly[wkIdx]||0), 0);
+  if(isSafes){
+    if(activeSeries === 'ALL'){
+      // One line per series
+      const seriesInView = [...new Set(filtered.map(p => p.type||'Unknown'))].sort();
+      seriesInView.forEach((series, idx) => {
+        const sProds = filtered.filter(p => p.type === series);
+        const data = labels.map(wk => { const i = WEEKS.indexOf(wk); return sProds.reduce((s,p) => s+(p.weekly[i]||0), 0); });
+        const color = TYPE_COLORS[idx % TYPE_COLORS.length];
+        datasets.push({ label: series, data, borderColor: color, backgroundColor: color+'33', borderWidth: 2, pointRadius: 3, pointHoverRadius: 5, tension: 0.3, fill: false });
       });
+    } else {
+      // One line per product within selected series
+      filtered.forEach((p, idx) => {
+        const data = labels.map(wk => { const i = WEEKS.indexOf(wk); return p.weekly[i]||0; });
+        const color = TYPE_COLORS[idx % TYPE_COLORS.length];
+        datasets.push({ label: p.name, data, borderColor: color, backgroundColor: color+'33', borderWidth: 2, pointRadius: 3, pointHoverRadius: 5, tension: 0.3, fill: false });
+      });
+    }
+  } else if(activeType === 'ALL'){
+    // One line per type (including "Philips Safes" as a combined line)
+    allTypes.forEach((type, idx) => {
+      const typeProds = type === 'Philips Safes'
+        ? brandFiltered.filter(p => SAFE_SERIES.includes(p.type||''))
+        : filtered.filter(p => (p.type||'Unknown') === type);
+      const data = labels.map(wk => { const i = WEEKS.indexOf(wk); return typeProds.reduce((s,p) => s+(p.weekly[i]||0), 0); });
       const color = getTypeColor(type, allTypes);
       datasets.push({ label: type, data, borderColor: color, backgroundColor: color+'33', borderWidth: 2, pointRadius: 3, pointHoverRadius: 5, tension: 0.3, fill: false });
     });
   } else {
     // One line per product within selected type
     filtered.forEach((p, idx) => {
-      const data = labels.map((wk,i) => {
-        const wkIdx = WEEKS.indexOf(wk);
-        return p.weekly[wkIdx]||0;
-      });
+      const data = labels.map(wk => { const i = WEEKS.indexOf(wk); return p.weekly[i]||0; });
       const color = TYPE_COLORS[idx % TYPE_COLORS.length];
-      const label = filtered.length <= 8 ? p.name : p.name.substring(0,12);
-      datasets.push({ label, data, borderColor: color, backgroundColor: color+'33', borderWidth: 2, pointRadius: 3, pointHoverRadius: 5, tension: 0.3, fill: false });
+      datasets.push({ label: filtered.length <= 8 ? p.name : p.name.substring(0,12), data, borderColor: color, backgroundColor: color+'33', borderWidth: 2, pointRadius: 3, pointHoverRadius: 5, tension: 0.3, fill: false });
     });
   }
-
-  const ctx = document.getElementById('typeChart').getContext('2d');
   if(typeChart) typeChart.destroy();
   typeChart = new Chart(ctx, {
     type: 'line',
@@ -1019,15 +1065,15 @@ function renderTypeChart(){
   });
 }
 
+function setActiveSeries(s){ activeSeries=s; renderTypeChart(); }
 function setActiveBrand(b){
-  activeBrand=b;
-  activeType='ALL';
+  activeBrand=b; activeType='ALL'; activeSeries='ALL';
   const sel=document.getElementById('typeFilterSel');
   if(sel) sel.value='ALL';
   renderTypeChart();
 }
 function setActiveType(t){
-  activeType=t;
+  activeType=t; activeSeries='ALL';
   const sel=document.getElementById('typeFilterSel');
   if(sel) sel.value=t;
   renderTypeChart();
