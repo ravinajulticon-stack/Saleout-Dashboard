@@ -1047,6 +1047,7 @@ function renderTypeChart(){
     });
   }
   if(typeChart) typeChart.destroy();
+  const ctx = document.getElementById('typeChart').getContext('2d');
   typeChart = new Chart(ctx, {
     type: 'line',
     data: { labels, datasets },
