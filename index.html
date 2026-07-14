@@ -1720,10 +1720,11 @@ function refreshSection(retailer, secName){
 
 function refreshDetailHeader(){
   if(activeRetailer==='All'){
-    const grand=Object.values(EDIT).reduce((s,r)=>s+r.total,0);
+    const grand=Object.values(EDIT).reduce((s,rd)=>s+Object.values(rd.sections||{}).reduce((ss,sec)=>ss+sec.products.reduce((ps,p)=>ps+p.weekly.reduce((a,b)=>a+(b>0?b:0),0),0),0),0);
     document.getElementById('detailTotalBadge').textContent=grand.toLocaleString();
   } else {
-    document.getElementById('detailTotalBadge').textContent=(EDIT[activeRetailer]?.total||0).toLocaleString();
+    const _rd=EDIT[activeRetailer];
+    document.getElementById('detailTotalBadge').textContent=Object.values(_rd?.sections||{}).reduce((s,sec)=>s+sec.products.reduce((ps,p)=>ps+p.weekly.reduce((a,b)=>a+(b>0?b:0),0),0),0).toLocaleString();
   }
 }
 
