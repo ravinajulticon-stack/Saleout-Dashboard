@@ -966,14 +966,15 @@ function switchView(v,btn){
 /* ── KPIs ── */
 function renderKpis(){
   const rets=getRetailers();
-  const grand=rets.reduce((s,r)=>s+(EDIT[r]?EDIT[r].total:0),0);
+  // Calculate grand total from weekly arrays (accurate, includes all weeks)
+  const grand=rets.reduce((s,r)=>s+Object.values(EDIT[r]?.sections||{}).reduce((ss,sec)=>ss+sec.products.reduce((ps,p)=>ps+p.weekly.slice(wkFrom,wkTo+1).reduce((a,b)=>a+(b>0?b:0),0),0),0),0);
   const wkSlice=getCombinedWeekly().slice(wkFrom,wkTo+1).filter(v=>v>0);
   const avg=wkSlice.length?Math.round(wkSlice.reduce((a,b)=>a+b,0)/wkSlice.length):0;
   const peak=Math.max(...wkSlice,0);
   const peakWk=WEEKS[wkFrom+wkSlice.indexOf(peak)]||'';
   let plocks=0,psafes=0,ddl=0,zigbang=0;
   rets.forEach(r=>Object.entries(EDIT[r]?EDIT[r].sections:{}).forEach(([sec,sd])=>{
-    const t=sd.products.filter(p=>p.total>0).reduce((s,p)=>s+p.total,0);
+    const t=sd.products.reduce((s,p)=>s+p.weekly.slice(wkFrom,wkTo+1).reduce((a,b)=>a+(b>0?b:0),0),0);
     if(sec.includes('PHILIPS LOCKS'))plocks+=t;
     else if(sec.includes('SAFES'))psafes+=t;
     else if(sec.includes('ZIGBANG'))zigbang+=t;
