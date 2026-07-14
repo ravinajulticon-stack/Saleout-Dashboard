@@ -832,7 +832,7 @@ const tabsEl=document.getElementById('retailerTabs');
   const b=document.createElement('button');
   b.className='pill'+(r==='All'?' active':'');
   b.textContent=r;
-  b.onclick=()=>{activeRetailer=r;activeType='ALL';activeBrand='ALL';activeSeries='ALL';document.querySelectorAll('.pill').forEach(t=>t.classList.remove('active'));b.classList.add('active');renderAll();};
+  b.onclick=()=>{activeRetailer=r;activeType='ALL';activeBrand='ALL';activeSeries='ALL';activeProduct='ALL';document.querySelectorAll('.pill').forEach(t=>t.classList.remove('active'));b.classList.add('active');renderAll();};
   tabsEl.appendChild(b);
 });
 
@@ -926,7 +926,7 @@ function renderProducts(){
 }
 
 /* ── type chart ── */
-let typeChart, activeType='ALL', activeBrand='ALL', activeSeries='ALL';
+let typeChart, activeType='ALL', activeBrand='ALL', activeSeries='ALL', activeProduct='ALL';
 const SAFE_SERIES = ['0000 Series','1000 Series','2000 Series','3000 Series','5000 Series','6000 Series','7000 Series'];
 const TYPE_COLORS=['#0a84ff','#30d158','#ff9f0a','#ff453a','#bf5af2','#64d2ff','#ffd60a','#ff6961','#77dd77','#fdcae1','#aec6cf','#b39eb5'];
 
@@ -979,9 +979,10 @@ function renderTypeChart(){
     if(sel.value !== activeType) activeType = sel.value;
   }
 
-  // Handle series pills for Philips Safes
+  // Handle pills — series for Safes, products for lock types
   const pillsEl = document.getElementById('seriesPills');
   const isSafes = activeType === 'Safes';
+  const isLockType = !isSafes && activeType !== 'ALL';
   if(pillsEl){
     if(isSafes){
       const availSeries = rawTypes.filter(t => SAFE_SERIES.includes(t)).sort();
@@ -991,9 +992,25 @@ function renderTypeChart(){
         const label = s === 'ALL' ? 'All series' : s;
         return `<button class="fp ${active?'active':''}" style="font-size:11px;padding:3px 10px;" onclick="setActiveSeries('${s}')">${label}</button>`;
       }).join('');
+    } else if(isLockType){
+      const typeProds = brandFiltered.filter(p => (p.type||'Unknown') === activeType);
+      const prodNames = [...new Set(typeProds.map(p => p.name))].sort();
+      pillsEl.style.display = 'flex';
+      pillsEl.innerHTML = '';
+      ['ALL', ...prodNames].forEach(n => {
+        const active = activeProduct === n;
+        const label = n === 'ALL' ? 'All products' : (n.length > 16 ? n.substring(0,16)+'…' : n);
+        const btn = document.createElement('button');
+        btn.className = 'fp' + (active ? ' active' : '');
+        btn.style.cssText = 'font-size:11px;padding:3px 10px;';
+        btn.textContent = label;
+        btn.addEventListener('click', () => setActiveProduct(n));
+        pillsEl.appendChild(btn);
+      });
     } else {
       pillsEl.style.display = 'none';
       activeSeries = 'ALL';
+      activeProduct = 'ALL';
     }
   }
 
@@ -1002,8 +1019,11 @@ function renderTypeChart(){
   if(isSafes){
     const seriesFiltered = brandFiltered.filter(p => SAFE_SERIES.includes(p.type||''));
     filtered = activeSeries === 'ALL' ? seriesFiltered : seriesFiltered.filter(p => p.type === activeSeries);
+  } else if(isLockType){
+    const typeFiltered = brandFiltered.filter(p => (p.type||'Unknown') === activeType);
+    filtered = activeProduct === 'ALL' ? typeFiltered : typeFiltered.filter(p => p.name === activeProduct);
   } else {
-    filtered = activeType === 'ALL' ? brandFiltered : brandFiltered.filter(p => (p.type||'Unknown') === activeType);
+    filtered = brandFiltered;
   }
 
   // Build datasets
@@ -1025,25 +1045,27 @@ function renderTypeChart(){
       filtered.forEach((p, idx) => {
         const data = labels.map(wk => { const i = WEEKS.indexOf(wk); return p.weekly[i]||0; });
         const color = TYPE_COLORS[idx % TYPE_COLORS.length];
-        datasets.push({ label: p.name, data, borderColor: color, backgroundColor: color+'33', borderWidth: 2, pointRadius: 3, pointHoverRadius: 5, tension: 0.3, fill: false });
+        const label = activeRetailer === 'All' ? `${p.name} (${p.retailer.substring(0,2).toUpperCase()})` : p.name;
+        datasets.push({ label, data, borderColor: color, backgroundColor: color+'33', borderWidth: 2, pointRadius: 3, pointHoverRadius: 5, tension: 0.3, fill: false });
       });
     }
   } else if(activeType === 'ALL'){
-    // One line per type (including "Philips Safes" as a combined line)
+    // One line per type (Safes grouped)
     allTypes.forEach((type, idx) => {
       const typeProds = type === 'Safes'
         ? brandFiltered.filter(p => SAFE_SERIES.includes(p.type||''))
-        : filtered.filter(p => (p.type||'Unknown') === type);
+        : brandFiltered.filter(p => (p.type||'Unknown') === type);
       const data = labels.map(wk => { const i = WEEKS.indexOf(wk); return typeProds.reduce((s,p) => s+(p.weekly[i]||0), 0); });
       const color = getTypeColor(type, allTypes);
       datasets.push({ label: type, data, borderColor: color, backgroundColor: color+'33', borderWidth: 2, pointRadius: 3, pointHoverRadius: 5, tension: 0.3, fill: false });
     });
   } else {
-    // One line per product within selected type
+    // isLockType — one line per product (filtered already handles activeProduct)
     filtered.forEach((p, idx) => {
       const data = labels.map(wk => { const i = WEEKS.indexOf(wk); return p.weekly[i]||0; });
       const color = TYPE_COLORS[idx % TYPE_COLORS.length];
-      datasets.push({ label: filtered.length <= 8 ? p.name : p.name.substring(0,12), data, borderColor: color, backgroundColor: color+'33', borderWidth: 2, pointRadius: 3, pointHoverRadius: 5, tension: 0.3, fill: false });
+      const label = activeRetailer === 'All' ? `${p.name} (${p.retailer.substring(0,2).toUpperCase()})` : p.name;
+      datasets.push({ label, data, borderColor: color, backgroundColor: color+'33', borderWidth: 2, pointRadius: 3, pointHoverRadius: 5, tension: 0.3, fill: false });
     });
   }
   if(typeChart) typeChart.destroy();
@@ -1066,15 +1088,16 @@ function renderTypeChart(){
   });
 }
 
+function setActiveProduct(p){ activeProduct=p; renderTypeChart(); }
 function setActiveSeries(s){ activeSeries=s; renderTypeChart(); }
 function setActiveBrand(b){
-  activeBrand=b; activeType='ALL'; activeSeries='ALL';
+  activeBrand=b; activeType='ALL'; activeSeries='ALL'; activeProduct='ALL';
   const sel=document.getElementById('typeFilterSel');
   if(sel) sel.value='ALL';
   renderTypeChart();
 }
 function setActiveType(t){
-  activeType=t; activeSeries='ALL';
+  activeType=t; activeSeries='ALL'; activeProduct='ALL';
   const sel=document.getElementById('typeFilterSel');
   if(sel) sel.value=t;
   renderTypeChart();
