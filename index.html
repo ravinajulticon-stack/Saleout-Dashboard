@@ -997,8 +997,9 @@ function renderTypeChart(){
       const prodNames = [...new Set(typeProds.map(p => p.name))].sort();
       const prev = prodSel.value;
       prodSel.innerHTML = '<option value="ALL">All Products</option>' + prodNames.map(n => `<option value="${n}">${n}</option>`).join('');
-      prodSel.value = prodNames.includes(prev) ? prev : 'ALL';
-      if(prodSel.value !== activeProduct) activeProduct = prodSel.value;
+      // Only reset if current activeProduct isn't valid for this type
+      if(!prodNames.includes(activeProduct)) activeProduct = 'ALL';
+      prodSel.value = activeProduct;
       prodSel.style.display = '';
       prodLabel.style.display = '';
     } else {
