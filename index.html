@@ -514,6 +514,10 @@ body {
     <select class="wk-sel" id="typeFilterSel" style="min-width:110px" onchange="setActiveType(this.value)">
       <option value="ALL">All Types</option>
     </select>
+    <span class="wk-label" id="productFilterLabel" style="margin-left:10px;display:none">Product</span>
+    <select class="wk-sel" id="productFilterSel" style="min-width:130px;display:none" onchange="setActiveProduct(this.value)">
+      <option value="ALL">All Products</option>
+    </select>
   </div>
 </div>
 
@@ -983,6 +987,28 @@ function renderTypeChart(){
   const pillsEl = document.getElementById('seriesPills');
   const isSafes = activeType === 'Safes';
   const isLockType = !isSafes && activeType !== 'ALL';
+
+  // Product dropdown (for lock types)
+  const prodSel = document.getElementById('productFilterSel');
+  const prodLabel = document.getElementById('productFilterLabel');
+  if(prodSel && prodLabel){
+    if(isLockType){
+      const typeProds = brandFiltered.filter(p => (p.type||'Unknown') === activeType);
+      const prodNames = [...new Set(typeProds.map(p => p.name))].sort();
+      const prev = prodSel.value;
+      prodSel.innerHTML = '<option value="ALL">All Products</option>' + prodNames.map(n => `<option value="${n}">${n}</option>`).join('');
+      prodSel.value = prodNames.includes(prev) ? prev : 'ALL';
+      if(prodSel.value !== activeProduct) activeProduct = prodSel.value;
+      prodSel.style.display = '';
+      prodLabel.style.display = '';
+    } else {
+      prodSel.style.display = 'none';
+      prodLabel.style.display = 'none';
+      activeProduct = 'ALL';
+    }
+  }
+
+  // Series pills (for Safes only)
   if(pillsEl){
     if(isSafes){
       const availSeries = rawTypes.filter(t => SAFE_SERIES.includes(t)).sort();
@@ -992,21 +1018,6 @@ function renderTypeChart(){
         const label = s === 'ALL' ? 'All series' : s;
         return `<button class="fp ${active?'active':''}" style="font-size:11px;padding:3px 10px;" onclick="setActiveSeries('${s}')">${label}</button>`;
       }).join('');
-    } else if(isLockType){
-      const typeProds = brandFiltered.filter(p => (p.type||'Unknown') === activeType);
-      const prodNames = [...new Set(typeProds.map(p => p.name))].sort();
-      pillsEl.style.display = 'flex';
-      pillsEl.innerHTML = '';
-      ['ALL', ...prodNames].forEach(n => {
-        const active = activeProduct === n;
-        const label = n === 'ALL' ? 'All products' : (n.length > 16 ? n.substring(0,16)+'…' : n);
-        const btn = document.createElement('button');
-        btn.className = 'fp' + (active ? ' active' : '');
-        btn.style.cssText = 'font-size:11px;padding:3px 10px;';
-        btn.textContent = label;
-        btn.addEventListener('click', () => setActiveProduct(n));
-        pillsEl.appendChild(btn);
-      });
     } else {
       pillsEl.style.display = 'none';
       activeSeries = 'ALL';
@@ -1088,12 +1099,21 @@ function renderTypeChart(){
   });
 }
 
-function setActiveProduct(p){ activeProduct=p; renderTypeChart(); }
+function setActiveProduct(p){
+  activeProduct=p;
+  const sel=document.getElementById('productFilterSel');
+  if(sel) sel.value=p;
+  renderTypeChart();
+}
 function setActiveSeries(s){ activeSeries=s; renderTypeChart(); }
 function setActiveBrand(b){
   activeBrand=b; activeType='ALL'; activeSeries='ALL'; activeProduct='ALL';
   const sel=document.getElementById('typeFilterSel');
   if(sel) sel.value='ALL';
+  const pSel=document.getElementById('productFilterSel');
+  const pLbl=document.getElementById('productFilterLabel');
+  if(pSel) pSel.style.display='none';
+  if(pLbl) pLbl.style.display='none';
   renderTypeChart();
 }
 function setActiveType(t){
