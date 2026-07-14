@@ -998,9 +998,9 @@ function renderTypeChart(){
       prodSel.innerHTML = '<option value="ALL">All Products</option>' + prodNames.map(n => `<option value="${n}">${n}</option>`).join('');
       // Only reset if current activeProduct isn't valid for this type
       if(!prodNames.includes(activeProduct)) activeProduct = 'ALL';
-      prodSel.removeEventListener('change', _onProductChange);
+      _skipProductChange = true;
       prodSel.value = activeProduct;
-      prodSel.addEventListener('change', _onProductChange);
+      _skipProductChange = false;
       prodSel.style.display = '';
       prodLabel.style.display = '';
     } else {
@@ -1101,13 +1101,14 @@ function renderTypeChart(){
   });
 }
 
+let _skipProductChange = false;
 function setActiveProduct(p){
   activeProduct=p;
   const sel=document.getElementById('productFilterSel');
-  if(sel){ sel.removeEventListener('change', _onProductChange); sel.value=p; sel.addEventListener('change', _onProductChange); }
+  if(sel){ _skipProductChange=true; sel.value=p; _skipProductChange=false; }
   renderTypeChart();
 }
-function _onProductChange(){ setActiveProduct(this.value); }
+function _onProductChange(){ if(!_skipProductChange) setActiveProduct(this.value); }
 function setActiveSeries(s){ activeSeries=s; renderTypeChart(); }
 function setActiveBrand(b){
   activeBrand=b; activeType='ALL'; activeSeries='ALL'; activeProduct='ALL';
