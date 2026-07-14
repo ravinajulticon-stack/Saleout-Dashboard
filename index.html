@@ -773,6 +773,8 @@ async function loadFromSupabase(){
     refreshWeekSelects();
     setSyncStatus('loaded');
     setTimeout(()=>setSyncStatus(''), 2000);
+    // Update detail header badge with fresh data
+    if(currentView === 'detail') refreshDetailHeader();
   } catch(e) {
     console.error('Load error:', e);
     setSyncStatus('error');
