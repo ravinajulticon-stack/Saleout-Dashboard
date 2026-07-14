@@ -1399,6 +1399,19 @@ function addWeekColumn(retailer, secName){
   // rebuild all visible section tables
   rebuildAllSectionTables();
 
+  // update retailer total badges in detail table
+  document.querySelectorAll('.ret-total-badge').forEach(badge => {
+    const heading = badge.closest('.ret-heading');
+    if(!heading) return;
+    const nameEl = heading.querySelector('.ret-heading-name');
+    if(!nameEl) return;
+    const retailer = nameEl.textContent.trim();
+    const rd = EDIT[retailer];
+    if(!rd) return;
+    const total = Object.values(rd.sections||{}).reduce((s,sec)=>s+sec.products.reduce((ps,p)=>ps+p.weekly.reduce((a,b)=>a+(b>0?b:0),0),0),0);
+    badge.textContent = total.toLocaleString();
+  });
+
   // if overview is visible, refresh it too
   if(currentView === 'overview') renderAll();
   debouncedSave();
