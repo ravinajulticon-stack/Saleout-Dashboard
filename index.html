@@ -969,14 +969,14 @@ function switchView(v,btn){
 function renderKpis(){
   const rets=getRetailers();
   // Calculate grand total from weekly arrays (accurate, includes all weeks)
-  const grand=rets.reduce((s,r)=>s+Object.values(EDIT[r]?.sections||{}).reduce((ss,sec)=>ss+sec.products.reduce((ps,p)=>ps+p.weekly.slice(wkFrom,wkTo+1).reduce((a,b)=>a+(b>0?b:0),0),0),0),0);
+  const grand=rets.reduce((s,r)=>s+Object.values(EDIT[r]?.sections||{}).reduce((ss,sec)=>ss+sec.products.reduce((ps,p)=>ps+p.weekly.slice(wkFrom,wkTo+1).reduce((a,b)=>a+b,0),0),0),0);
   const wkSlice=getCombinedWeekly().slice(wkFrom,wkTo+1).filter(v=>v>0);
   const avg=wkSlice.length?Math.round(wkSlice.reduce((a,b)=>a+b,0)/wkSlice.length):0;
   const peak=Math.max(...wkSlice,0);
   const peakWk=WEEKS[wkFrom+wkSlice.indexOf(peak)]||'';
   let plocks=0,psafes=0,ddl=0,zigbang=0;
   rets.forEach(r=>Object.entries(EDIT[r]?EDIT[r].sections:{}).forEach(([sec,sd])=>{
-    const t=sd.products.reduce((s,p)=>s+p.weekly.slice(wkFrom,wkTo+1).reduce((a,b)=>a+(b>0?b:0),0),0);
+    const t=sd.products.reduce((s,p)=>s+p.weekly.slice(wkFrom,wkTo+1).reduce((a,b)=>a+b,0),0);
     if(sec.includes('PHILIPS LOCKS'))plocks+=t;
     else if(sec.includes('SAFES'))psafes+=t;
     else if(sec.includes('ZIGBANG'))zigbang+=t;
@@ -1267,7 +1267,7 @@ function renderSparks(){
       <div class="spark-top">
         <div style="min-width:0;flex:1;overflow:hidden">
           <div class="spark-name">${r}</div>
-          <div class="spark-total" style="color:${COLORS[i]}">${Object.values(EDIT[r]?.sections||{}).reduce((s,sec)=>s+sec.products.reduce((ps,p)=>ps+p.weekly.slice(wkFrom,wkTo+1).reduce((a,b)=>a+(b>0?b:0),0),0),0).toLocaleString()}</div>
+          <div class="spark-total" style="color:${COLORS[i]}">${Object.values(EDIT[r]?.sections||{}).reduce((s,sec)=>s+sec.products.reduce((ps,p)=>ps+p.weekly.slice(wkFrom,wkTo+1).reduce((a,b)=>a+b,0),0),0).toLocaleString()}</div>
         </div>
         <div class="spark-peak">
           <div class="spark-peak-val" style="color:${COLORS[i]}">${peak}</div>
@@ -1324,7 +1324,7 @@ function updateTotalCells(retailer, secName){
   }
   // update section total badge
   const totalEl=document.getElementById(`st_${sid}`);
-  if(totalEl){ const t=sec.products.reduce((s,p)=>s+p.weekly.reduce((a,b)=>a+(b>0?b:0),0),0); totalEl.textContent=t>0?t.toLocaleString():'—'; }
+  if(totalEl){ const t=sec.products.reduce((s,p)=>s+p.weekly.reduce((a,b)=>a+b,0),0); totalEl.textContent=t>0?t.toLocaleString():'—'; }
   refreshDetailHeader();
 }
 
@@ -1410,7 +1410,7 @@ function addWeekColumn(retailer, secName){
     const retailer = nameEl.textContent.trim();
     const rd = EDIT[retailer];
     if(!rd) return;
-    const total = Object.values(rd.sections||{}).reduce((s,sec)=>s+sec.products.reduce((ps,p)=>ps+p.weekly.reduce((a,b)=>a+(b>0?b:0),0),0),0);
+    const total = Object.values(rd.sections||{}).reduce((s,sec)=>s+sec.products.reduce((ps,p)=>ps+p.weekly.reduce((a,b)=>a+b,0),0),0);
     badge.textContent = total.toLocaleString();
   });
 
@@ -1555,11 +1555,11 @@ function renderTbody(tbody, retailer, secName, secData, secColor){
   const prods=secData.products;
   const cols=getSecCols(retailer, secName);
   const nCols=cols.length;
-  const maxProd=Math.max(...prods.map(p=>p.weekly.reduce((a,b)=>a+(b>0?b:0),0)),1);
+  const maxProd=Math.max(...prods.map(p=>p.weekly.reduce((a,b)=>a+b,0)),1);
   prods.forEach((p,pIdx)=>{
     const weekly=p.weekly.slice(0, nCols);
     while(weekly.length<nCols) weekly.push(0);
-    const _pTotal=p.weekly.reduce((a,b)=>a+(b>0?b:0),0);
+    const _pTotal=p.weekly.reduce((a,b)=>a+b,0);
     const pos=weekly.filter(v=>v>0);
     const mean=pos.length?pos.reduce((a,b)=>a+b,0)/pos.length:0;
     const sd=pos.length>1?Math.sqrt(pos.reduce((s,v)=>s+(v-mean)**2,0)/pos.length):0;
@@ -1590,7 +1590,7 @@ function renderTbody(tbody, retailer, secName, secData, secColor){
     typetd.appendChild(te); tr.appendChild(typetd);
     // total td
     const ttd=document.createElement('td'); ttd.className='col-total';
-    const _pt=p.weekly.reduce((a,b)=>a+(b>0?b:0),0);
+    const _pt=p.weekly.reduce((a,b)=>a+b,0);
     ttd.textContent=_pt!==0?_pt:'—'; tr.appendChild(ttd);
     // weekly tds
     weekly.forEach((v,wIdx)=>{
@@ -1649,7 +1649,7 @@ function buildSectionBlock(retailer, secName, secData, secColor){
   const sid=`sb_${retailer}_${secName}`.replace(/[^a-z0-9]/gi,'_');
   // header
   const hd=document.createElement('div'); hd.className='sec-hd';
-  hd.innerHTML=`<span class="sec-hd-name" style="color:${secColor}" contenteditable="true" spellcheck="false" onblur="renameSectionFromEl(this,'${retailer}','${secName}')">${secName}</span><div class="sec-hd-right"><span class="sec-total" style="color:${secColor}" id="st_${sid}">${(()=>{const t=secData.products.reduce((s,p)=>s+p.weekly.reduce((a,b)=>a+(b>0?b:0),0),0);return t>0?t.toLocaleString():'—';})()}</span><button class="ic-btn btn-del" onclick="removeSection('${retailer}','${secName}')" title="Remove section">✕</button></div>`;
+  hd.innerHTML=`<span class="sec-hd-name" style="color:${secColor}" contenteditable="true" spellcheck="false" onblur="renameSectionFromEl(this,'${retailer}','${secName}')">${secName}</span><div class="sec-hd-right"><span class="sec-total" style="color:${secColor}" id="st_${sid}">${(()=>{const t=secData.products.reduce((s,p)=>s+p.weekly.reduce((a,b)=>a+b,0),0);return t>0?t.toLocaleString():'—';})()}</span><button class="ic-btn btn-del" onclick="removeSection('${retailer}','${secName}')" title="Remove section">✕</button></div>`;
   block.appendChild(hd);
   // scroll+table
   const scroll=document.createElement('div'); scroll.className='tbl-scroll';
@@ -1724,11 +1724,11 @@ function refreshSection(retailer, secName){
 
 function refreshDetailHeader(){
   if(activeRetailer==='All'){
-    const grand=Object.values(EDIT).reduce((s,rd)=>s+Object.values(rd.sections||{}).reduce((ss,sec)=>ss+sec.products.reduce((ps,p)=>ps+p.weekly.reduce((a,b)=>a+(b>0?b:0),0),0),0),0);
+    const grand=Object.values(EDIT).reduce((s,rd)=>s+Object.values(rd.sections||{}).reduce((ss,sec)=>ss+sec.products.reduce((ps,p)=>ps+p.weekly.reduce((a,b)=>a+b,0),0),0),0);
     document.getElementById('detailTotalBadge').textContent=grand.toLocaleString();
   } else {
     const _rd=EDIT[activeRetailer];
-    document.getElementById('detailTotalBadge').textContent=Object.values(_rd?.sections||{}).reduce((s,sec)=>s+sec.products.reduce((ps,p)=>ps+p.weekly.reduce((a,b)=>a+(b>0?b:0),0),0),0).toLocaleString();
+    document.getElementById('detailTotalBadge').textContent=Object.values(_rd?.sections||{}).reduce((s,sec)=>s+sec.products.reduce((ps,p)=>ps+p.weekly.reduce((a,b)=>a+b,0),0),0).toLocaleString();
   }
 }
 
@@ -1774,7 +1774,7 @@ function renderRetailerBlock(container, retailer){
   const color=COLORS[rIdx]||'#0a84ff';
   if(activeRetailer==='All'){
     const h=document.createElement('div'); h.className='ret-heading';
-    h.innerHTML=`<span class="ret-heading-name" style="color:${color}">${retailer}</span><div class="ret-heading-right"><span class="ret-total-badge" style="background:${color}">${Object.values(rd.sections||{}).reduce((s,sec)=>s+sec.products.reduce((ps,p)=>ps+p.weekly.reduce((a,b)=>a+(b>0?b:0),0),0),0).toLocaleString()}</span><button class="ic-btn btn-add" onclick="addSection('${retailer}')">+ Section</button></div>`;
+    h.innerHTML=`<span class="ret-heading-name" style="color:${color}">${retailer}</span><div class="ret-heading-right"><span class="ret-total-badge" style="background:${color}">${Object.values(rd.sections||{}).reduce((s,sec)=>s+sec.products.reduce((ps,p)=>ps+p.weekly.reduce((a,b)=>a+b,0),0),0).toLocaleString()}</span><button class="ic-btn btn-add" onclick="addSection('${retailer}')">+ Section</button></div>`;
     container.appendChild(h);
   }
   Object.entries(rd.sections).forEach(([secName,secData])=>{
@@ -1790,11 +1790,11 @@ function renderDetail(){
   const rets=isAll?Object.keys(EDIT):[activeRetailer];
   if(isAll){
     document.getElementById('detailRetailerName').textContent='All Retailers';
-    document.getElementById('detailTotalBadge').textContent=Object.values(EDIT).reduce((s,rd)=>s+Object.values(rd.sections||{}).reduce((ss,sec)=>ss+sec.products.reduce((ps,p)=>ps+p.weekly.reduce((a,b)=>a+(b>0?b:0),0),0),0),0).toLocaleString();
+    document.getElementById('detailTotalBadge').textContent=Object.values(EDIT).reduce((s,rd)=>s+Object.values(rd.sections||{}).reduce((ss,sec)=>ss+sec.products.reduce((ps,p)=>ps+p.weekly.reduce((a,b)=>a+b,0),0),0),0).toLocaleString();
   } else {
     document.getElementById('detailRetailerName').textContent=activeRetailer;
     const _rd=EDIT[activeRetailer];
-    document.getElementById('detailTotalBadge').textContent=Object.values(_rd?.sections||{}).reduce((s,sec)=>s+sec.products.reduce((ps,p)=>ps+p.weekly.reduce((a,b)=>a+(b>0?b:0),0),0),0).toLocaleString();
+    document.getElementById('detailTotalBadge').textContent=Object.values(_rd?.sections||{}).reduce((s,sec)=>s+sec.products.reduce((ps,p)=>ps+p.weekly.reduce((a,b)=>a+b,0),0),0).toLocaleString();
   }
   rets.forEach(r=>renderRetailerBlock(container,r));
   const bb=document.createElement('div'); bb.className='bottom-bar';
