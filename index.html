@@ -1324,7 +1324,7 @@ function updateTotalCells(retailer, secName){
   }
   // update section total badge
   const totalEl=document.getElementById(`st_${sid}`);
-  if(totalEl) totalEl.textContent=sec.total>0?sec.total.toLocaleString():'—';
+  if(totalEl){ const t=sec.products.reduce((s,p)=>s+p.weekly.reduce((a,b)=>a+(b>0?b:0),0),0); totalEl.textContent=t>0?t.toLocaleString():'—'; }
   refreshDetailHeader();
 }
 
@@ -1647,7 +1647,7 @@ function buildSectionBlock(retailer, secName, secData, secColor){
   const sid=`sb_${retailer}_${secName}`.replace(/[^a-z0-9]/gi,'_');
   // header
   const hd=document.createElement('div'); hd.className='sec-hd';
-  hd.innerHTML=`<span class="sec-hd-name" style="color:${secColor}" contenteditable="true" spellcheck="false" onblur="renameSectionFromEl(this,'${retailer}','${secName}')">${secName}</span><div class="sec-hd-right"><span class="sec-total" style="color:${secColor}" id="st_${sid}">${secData.total>0?secData.total.toLocaleString():'—'}</span><button class="ic-btn btn-del" onclick="removeSection('${retailer}','${secName}')" title="Remove section">✕</button></div>`;
+  hd.innerHTML=`<span class="sec-hd-name" style="color:${secColor}" contenteditable="true" spellcheck="false" onblur="renameSectionFromEl(this,'${retailer}','${secName}')">${secName}</span><div class="sec-hd-right"><span class="sec-total" style="color:${secColor}" id="st_${sid}">${(()=>{const t=secData.products.reduce((s,p)=>s+p.weekly.reduce((a,b)=>a+(b>0?b:0),0),0);return t>0?t.toLocaleString():'—';})()}</span><button class="ic-btn btn-del" onclick="removeSection('${retailer}','${secName}')" title="Remove section">✕</button></div>`;
   block.appendChild(hd);
   // scroll+table
   const scroll=document.createElement('div'); scroll.className='tbl-scroll';
