@@ -1555,14 +1555,15 @@ function renderTbody(tbody, retailer, secName, secData, secColor){
   const prods=secData.products;
   const cols=getSecCols(retailer, secName);
   const nCols=cols.length;
-  const maxProd=Math.max(...prods.map(p=>Math.abs(p.total)),1);
+  const maxProd=Math.max(...prods.map(p=>p.weekly.reduce((a,b)=>a+(b>0?b:0),0)),1);
   prods.forEach((p,pIdx)=>{
     const weekly=p.weekly.slice(0, nCols);
     while(weekly.length<nCols) weekly.push(0);
+    const _pTotal=p.weekly.reduce((a,b)=>a+(b>0?b:0),0);
     const pos=weekly.filter(v=>v>0);
     const mean=pos.length?pos.reduce((a,b)=>a+b,0)/pos.length:0;
     const sd=pos.length>1?Math.sqrt(pos.reduce((s,v)=>s+(v-mean)**2,0)/pos.length):0;
-    const barPct=Math.round(Math.max(p.total,0)/maxProd*100);
+    const barPct=Math.round(Math.max(_pTotal,0)/maxProd*100);
     const tr=document.createElement('tr');
     // number td
     const numtd=document.createElement('td'); numtd.className='col-num';
@@ -1589,7 +1590,8 @@ function renderTbody(tbody, retailer, secName, secData, secColor){
     typetd.appendChild(te); tr.appendChild(typetd);
     // total td
     const ttd=document.createElement('td'); ttd.className='col-total';
-    ttd.textContent=p.total!==0?p.total:'—'; tr.appendChild(ttd);
+    const _pt=p.weekly.reduce((a,b)=>a+(b>0?b:0),0);
+    ttd.textContent=_pt!==0?_pt:'—'; tr.appendChild(ttd);
     // weekly tds
     weekly.forEach((v,wIdx)=>{
       const td=document.createElement('td');
