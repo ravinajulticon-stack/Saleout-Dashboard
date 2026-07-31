@@ -1039,6 +1039,11 @@ function renderPills(){
     return `<button class="fp ${activeSection===s?'active':''}" onclick="setSection('${s}')">${label}</button>`;
   }).join('');
 }
+function setSection(s){
+  activeSection=s;
+  renderPills();
+  renderProducts();
+}
 function setQuarter(q){
   const ranges = {
     1: ['WK27','WK39'], 2: ['WK40','WK52'],
