@@ -743,6 +743,7 @@ async function loadFromSupabase(){
       wkHeaders.forEach(h => WEEK_HEADERS.push({ wk:h.wk, date:h.date, day:h.day }));
       WEEKS.length = 0;
       WEEK_HEADERS.forEach(h => WEEKS.push(h.wk));
+      assignWeekYears();
       wkTo = WEEKS.length - 1;
       wkFrom = 0;
     }
@@ -796,16 +797,33 @@ const RAW = {"Bunnings": {"total": 4245, "weeks": ["WK27", "WK28", "WK29", "WK30
 let WEEKS=["WK27","WK28","WK29","WK30","WK31","WK32","WK33","WK34","WK35","WK36","WK37","WK38","WK39","WK40","WK41","WK42","WK43","WK44","WK45","WK46","WK47","WK48","WK49","WK50","WK51","WK52","WK01"];
 let WEEK_HEADERS=[{"wk":"WK27","date":"4-Jan","day":"Sun"},{"wk":"WK28","date":"11-Jan","day":"Sun"},{"wk":"WK29","date":"18-Jan","day":"Sun"},{"wk":"WK30","date":"25-Jan","day":"Sun"},{"wk":"WK31","date":"1-Feb","day":"Sun"},{"wk":"WK32","date":"8-Feb","day":"Sun"},{"wk":"WK33","date":"15-Feb","day":"Sun"},{"wk":"WK34","date":"22-Feb","day":"Sun"},{"wk":"WK35","date":"1-Mar","day":"Sun"},{"wk":"WK36","date":"8-Mar","day":"Sun"},{"wk":"WK37","date":"15-Mar","day":"Sun"},{"wk":"WK38","date":"22-Mar","day":"Sun"},{"wk":"WK39","date":"29-Mar","day":"Sun"},{"wk":"WK40","date":"5-Apr","day":"Sun"},{"wk":"WK41","date":"12-Apr","day":"Sun"},{"wk":"WK42","date":"19-Apr","day":"Sun"},{"wk":"WK43","date":"26-Apr","day":"Sun"},{"wk":"WK44","date":"3-May","day":"Sun"},{"wk":"WK45","date":"10-May","day":"Sun"},{"wk":"WK46","date":"17-May","day":"Sun"},{"wk":"WK47","date":"24-May","day":"Sun"},{"wk":"WK48","date":"31-May","day":"Sun"},{"wk":"WK49","date":"7-Jun","day":"Sun"},{"wk":"WK50","date":"14-Jun","day":"Sun"},{"wk":"WK51","date":"21-Jun","day":"Sun"},{"wk":"WK52","date":"28-Jun","day":"Sun"}];
 // ── Fiscal year config ──
-// The calendar year in which WK01 of the CURRENT cycle falls (e.g. WK01 "6-Jul" -> 2026).
-// Bump this by 1 whenever a new WK01 is started for a new cycle.
-const FY_START_YEAR = 2026;
-const JAN_JUN_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun'];
-function yearForDate(dateStr){
-  // dateStr like "4-Jan" or "5-Jul". Jul-Dec falls in FY_START_YEAR, Jan-Jun falls in FY_START_YEAR+1.
-  if(!dateStr) return FY_START_YEAR;
-  const m = dateStr.split('-')[1];
-  return JAN_JUN_MONTHS.includes(m) ? FY_START_YEAR+1 : FY_START_YEAR;
+// The calendar year the FIRST week in WEEK_HEADERS falls in (WK27 "4-Jan" -> 2026).
+// Year is then derived sequentially: it only increments when the week-order
+// actually crosses from December into January. This correctly keeps existing
+// Jan-Jun weeks (WK27-52) at 2026, while future Jan-Jun weeks added after a
+// real Dec->Jan crossing get 2027, etc.
+const ANCHOR_YEAR = 2026;
+const MONTH_IDX = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+function assignWeekYears(){
+  let year = ANCHOR_YEAR, prevMonth = null;
+  WEEK_HEADERS.forEach(h=>{
+    const m = MONTH_IDX[(h.date||'').split('-')[1]];
+    if(prevMonth!=null && m!=null && m < prevMonth) year++;
+    if(m!=null) prevMonth = m;
+    h.year = year;
+  });
 }
+// Year for a brand-new week being appended at the end (used before it's pushed to WEEK_HEADERS)
+function nextWeekYear(dateStr){
+  const last = WEEK_HEADERS[WEEK_HEADERS.length-1];
+  if(!last) return ANCHOR_YEAR;
+  const lastMonth = MONTH_IDX[(last.date||'').split('-')[1]];
+  const newMonth = MONTH_IDX[(dateStr||'').split('-')[1]];
+  let year = last.year!=null ? last.year : ANCHOR_YEAR;
+  if(newMonth!=null && lastMonth!=null && newMonth < lastMonth) year++;
+  return year;
+}
+assignWeekYears();
 const RETAILERS=Object.keys(RAW);
 const COLORS=['#0a84ff','#30d158','#ff9f0a','#ff453a','#bf5af2','#5ac8fa'];
 const SEC_COLORS={'PHILIPS LOCKS SOLD':'#0a84ff','SAMSUNG LOCKS SOLD':'#ff453a','DDL LOCKS SOLD':'#ff9f0a','DDL & ZIG LOCKS SOLD':'#ff9f0a','ZIGBANG LOCKS SOLD':'#bf5af2','PHILIPS SAFES SOLD':'#30d158'};
@@ -962,7 +980,7 @@ function refreshWeekSelects(){
   selTo.innerHTML   = '';
   WEEKS.forEach((w,i)=>{
     const hdr = WEEK_HEADERS.find(h => h.wk === w);
-    const label = hdr ? `${w} ${hdr.date}-${String(yearForDate(hdr.date)).slice(-2)}` : w;
+    const label = hdr ? `${w} ${hdr.date}-${String(hdr.year!=null?hdr.year:ANCHOR_YEAR).slice(-2)}` : w;
     selFrom.add(new Option(label,i));
     selTo.add(new Option(label,i));
   });
@@ -1415,13 +1433,13 @@ function cellClass(v,mean,stdDev){
 // Per-section custom column lists (extends WEEK_HEADERS with user-added columns)
 const SEC_COLS = {}; // key: "retailer__secName" -> [{wk,date,day,idx}]
 
-function getDayFromDate(dateStr){
-  // dateStr like "4-Jan", "28-Jun", "5-Jul"
+function getDayFromDate(dateStr, year){
+  // dateStr like "4-Jan", "28-Jun", "5-Jul". year defaults to next sequential year if omitted.
   if(!dateStr) return '';
   try {
-    const months = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
     const [d, m] = dateStr.split('-');
-    const dt = new Date(yearForDate(dateStr), months[m], parseInt(d));
+    const yr = year!=null ? year : nextWeekYear(dateStr);
+    const dt = new Date(yr, MONTH_IDX[m], parseInt(d));
     return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][dt.getDay()];
   } catch(e){ return ''; }
 }
@@ -1442,7 +1460,8 @@ function addWeekColumn(retailer, secName){
   const wkName = prompt('Week label:', `WK${nextWk}`) || '';
   if(!wkName.trim()) return;
   const dateLabel = prompt('Date label (e.g. 5-Jul):', '') || '';
-  const dayLabel = getDayFromDate(dateLabel.trim());
+  const newYear = nextWeekYear(dateLabel.trim());
+  const dayLabel = getDayFromDate(dateLabel.trim(), newYear);
   const newCol = { wk: wkName.trim(), date: dateLabel.trim(), day: dayLabel, custom: true };
 
   // propagate to ALL retailers and ALL sections
@@ -1461,6 +1480,7 @@ function addWeekColumn(retailer, secName){
   // also add to the global WEEK_HEADERS and WEEKS so new sections created later include it
   WEEK_HEADERS.push({ ...newCol });
   WEEKS.push(newCol.wk);
+  assignWeekYears();
 
   // refresh the week range selects in Overview toolbar
   refreshWeekSelects();
@@ -1509,6 +1529,7 @@ function removeWeekColumn(retailer, secName, colIdx){
   if(ghIdx !== -1) WEEK_HEADERS.splice(ghIdx, 1);
   const wIdx = WEEKS.indexOf(wkLabel);
   if(wIdx !== -1) WEEKS.splice(wIdx, 1);
+  assignWeekYears();
 
   // refresh Overview week selects
   refreshWeekSelects();
