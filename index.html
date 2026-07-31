@@ -906,6 +906,11 @@ function renderTop5(){
 
 /* ── Slow / No Movement ── */
 function renderSlowMovers(){
+  const el0 = document.getElementById('slowMovers');
+  if(wkTo < wkFrom || wkTo < 0){
+    el0.innerHTML = '<div style="color:var(--text-3);font-size:12px;padding:8px">No data available for the selected period.</div>';
+    return;
+  }
   const rets = getRetailers();
   const lookback = 4;
   const startIdx = Math.max(0, wkTo - lookback + 1);
