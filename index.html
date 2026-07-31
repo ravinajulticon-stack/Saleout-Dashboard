@@ -1606,7 +1606,24 @@ function rebuildSectionTable(retailer, secName){
 function updateColLabel(retailer, secName, colIdx, field, val){
   if(!val) return;
   const cols = getSecCols(retailer, secName);
-  if(cols[colIdx]){ cols[colIdx][field] = val; debouncedSave(); }
+  if(!cols[colIdx]) return;
+  cols[colIdx][field] = val;
+
+  // Propagate to the global WEEK_HEADERS (this is what actually gets saved to
+  // Supabase's week_headers table, and what the Overview quarter/week filters read from)
+  if(WEEK_HEADERS[colIdx]) WEEK_HEADERS[colIdx][field] = val;
+
+  // Propagate to every other retailer/section's own column copy so nothing
+  // silently disagrees about this week's label/date
+  Object.values(SEC_COLS).forEach(c => { if(c[colIdx]) c[colIdx][field] = val; });
+
+  // Date edits can shift which weeks count as "next calendar year"
+  if(field === 'date') assignWeekYears();
+
+  debouncedSave();
+  rebuildAllSectionTables();
+  refreshWeekSelects();
+  if(currentView === 'overview') renderAll();
 }
 
 function renameSectionFromEl(el, retailer, oldName){
@@ -1629,13 +1646,19 @@ function renameSectionFromEl(el, retailer, oldName){
 function updateColDay(retailer, secName, colIdx){
   const cols = getSecCols(retailer, secName);
   if(!cols[colIdx]) return;
-  const day = getDayFromDate(cols[colIdx].date);
+  const yr = WEEK_HEADERS[colIdx]?.year;
+  const day = getDayFromDate(cols[colIdx].date, yr);
   cols[colIdx].day = day;
+
+  // Propagate day to the global header and every other section's copy, same as the label/date edit above
+  if(WEEK_HEADERS[colIdx]) WEEK_HEADERS[colIdx].day = day;
+  Object.values(SEC_COLS).forEach(c => { if(c[colIdx]) c[colIdx].day = day; });
+
   debouncedSave();
-  // update the displayed day label without full rebuild
-  const key = (retailer+'_'+secName+'_'+colIdx).replace(/[^a-z0-9_]/gi,'_');
-  const el = document.getElementById('day_'+key);
-  if(el) el.textContent = day;
+  // update the displayed day label everywhere it's currently rendered, without a full rebuild
+  document.querySelectorAll(`[id^="day_"]`).forEach(el=>{
+    if(el.id.endsWith('_'+colIdx)) el.textContent = day;
+  });
 }
 
 function renderTbody(tbody, retailer, secName, secData, secColor){
