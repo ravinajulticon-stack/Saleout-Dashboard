@@ -142,6 +142,9 @@ body {
 /* week range */
 .wk-range { display: flex; align-items: center; gap: 6px; }
 .wk-label { font-size: 11px; color: var(--text-3); font-weight: 500; }
+.qtr-btn { padding: 3px 10px; border-radius: 6px; border: 0.5px solid var(--border); background: var(--surface-2); color: var(--text-2); font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+.qtr-btn:hover { background: var(--surface-3); color: var(--text); }
+.qtr-btn.active { background: var(--blue); color: #fff; border-color: var(--blue); }
 .wk-sel {
   background: var(--surface-1);
   border: 1px solid var(--border-strong);
@@ -502,10 +505,17 @@ body {
   <div class="toolbar-sep"></div>
   <!-- week range (overview only) -->
   <div class="wk-range" id="wkRangeCtrl">
+    <div id="quarterBtns" style="display:flex;gap:4px;margin-right:10px">
+      <button class="qtr-btn" onclick="setQuarter(1)">Q1</button>
+      <button class="qtr-btn" onclick="setQuarter(2)">Q2</button>
+      <button class="qtr-btn" onclick="setQuarter(3)">Q3</button>
+      <button class="qtr-btn" onclick="setQuarter(4)">Q4</button>
+      <button class="qtr-btn" onclick="setQuarter(0)">All</button>
+    </div>
     <span class="wk-label">From</span>
-    <select class="wk-sel" id="wkFrom"></select>
+    <select class="wk-sel" id="wkFrom" style="min-width:110px"></select>
     <span class="wk-label">to</span>
-    <select class="wk-sel" id="wkTo"></select>
+    <select class="wk-sel" id="wkTo" style="min-width:110px"></select>
     <span class="wk-label" style="margin-left:10px">Brand</span>
     <select class="wk-sel" id="brandFilterSel" style="min-width:120px" onchange="setActiveBrand(this.value)">
       <option value="ALL">All Brands</option>
@@ -934,7 +944,12 @@ const selFrom=document.getElementById('wkFrom'),selTo=document.getElementById('w
 function refreshWeekSelects(){
   selFrom.innerHTML = '';
   selTo.innerHTML   = '';
-  WEEKS.forEach((w,i)=>{ selFrom.add(new Option(w,i)); selTo.add(new Option(w,i)); });
+  WEEKS.forEach((w,i)=>{
+    const hdr = WEEK_HEADERS.find(h => h.wk === w);
+    const label = hdr ? `${w} ${hdr.date}` : w;
+    selFrom.add(new Option(label,i));
+    selTo.add(new Option(label,i));
+  });
   wkFrom = 0;
   wkTo   = WEEKS.length - 1;
   selFrom.value = wkFrom;
@@ -942,8 +957,8 @@ function refreshWeekSelects(){
 }
 
 refreshWeekSelects();
-selFrom.addEventListener('change',()=>{wkFrom=+selFrom.value;renderAll();});
-selTo.addEventListener('change',()=>{wkTo=+selTo.value;renderAll();});
+selFrom.addEventListener('change',()=>{wkFrom=+selFrom.value;document.querySelectorAll('.qtr-btn').forEach(b=>b.classList.remove('active'));renderAll();});
+selTo.addEventListener('change',()=>{wkTo=+selTo.value;document.querySelectorAll('.qtr-btn').forEach(b=>b.classList.remove('active'));renderAll();});
 
 /* ── retailer tabs ── */
 const tabsEl=document.getElementById('retailerTabs');
@@ -1024,7 +1039,36 @@ function renderPills(){
     return `<button class="fp ${activeSection===s?'active':''}" onclick="setSection('${s}')">${label}</button>`;
   }).join('');
 }
-function setSection(s){activeSection=s;renderAll();}
+function setQuarter(q){
+  // FY2026 quarters: Q1=WK27-WK39, Q2=WK40-WK52, Q3=WK01-WK13, Q4=WK14-WK26
+  const ranges = {
+    1: ['WK27','WK39'], 2: ['WK40','WK52'],
+    3: ['WK01','WK13'], 4: ['WK14','WK26']
+  };
+  // Update active button
+  document.querySelectorAll('.qtr-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.qtr-btn')[q === 0 ? 4 : q-1]?.classList.add('active');
+  if(q === 0){
+    wkFrom = 0; wkTo = WEEKS.length - 1;
+  } else {
+    const [from, to] = ranges[q];
+    const fromIdx = WEEKS.indexOf(from);
+    const toIdx = WEEKS.lastIndexOf(to); // use lastIndexOf in case some weeks missing
+    // If exact week not found, find nearest
+    const f = fromIdx >= 0 ? fromIdx : WEEKS.findIndex(w => w >= from);
+    const t = toIdx >= 0 ? toIdx : [...WEEKS].reverse().findIndex(w => w <= to);
+    const tIdx = toIdx >= 0 ? toIdx : WEEKS.length - 1 - [...WEEKS].reverse().findIndex(w => w <= to);
+    wkFrom = Math.max(0, f >= 0 ? f : 0);
+    wkTo = Math.min(WEEKS.length - 1, tIdx >= 0 ? tIdx : WEEKS.length - 1);
+  }
+  // Sync dropdowns
+  const selFrom = document.getElementById('wkFrom');
+  const selTo = document.getElementById('wkTo');
+  if(selFrom) selFrom.value = wkFrom;
+  if(selTo) selTo.value = wkTo;
+  renderAll();
+}
+
 
 /* ── products table ── */
 function renderProducts(){
