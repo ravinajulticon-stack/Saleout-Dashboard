@@ -946,7 +946,7 @@ function refreshWeekSelects(){
   selTo.innerHTML   = '';
   WEEKS.forEach((w,i)=>{
     const hdr = WEEK_HEADERS.find(h => h.wk === w);
-    const label = hdr ? `${w} ${hdr.date}` : w;
+    const label = hdr ? `${w} ${hdr.date}-26` : w;
     selFrom.add(new Option(label,i));
     selTo.add(new Option(label,i));
   });
