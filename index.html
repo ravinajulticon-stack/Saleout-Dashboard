@@ -1040,28 +1040,30 @@ function renderPills(){
   }).join('');
 }
 function setQuarter(q){
-  // FY2026 quarters: Q1=WK27-WK39, Q2=WK40-WK52, Q3=WK01-WK13, Q4=WK14-WK26
   const ranges = {
     1: ['WK27','WK39'], 2: ['WK40','WK52'],
     3: ['WK01','WK13'], 4: ['WK14','WK26']
   };
-  // Update active button
   document.querySelectorAll('.qtr-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.qtr-btn')[q === 0 ? 4 : q-1]?.classList.add('active');
+
   if(q === 0){
     wkFrom = 0; wkTo = WEEKS.length - 1;
   } else {
     const [from, to] = ranges[q];
-    const fromIdx = WEEKS.indexOf(from);
-    const toIdx = WEEKS.lastIndexOf(to); // use lastIndexOf in case some weeks missing
-    // If exact week not found, find nearest
-    const f = fromIdx >= 0 ? fromIdx : WEEKS.findIndex(w => w >= from);
-    const t = toIdx >= 0 ? toIdx : [...WEEKS].reverse().findIndex(w => w <= to);
-    const tIdx = toIdx >= 0 ? toIdx : WEEKS.length - 1 - [...WEEKS].reverse().findIndex(w => w <= to);
-    wkFrom = Math.max(0, f >= 0 ? f : 0);
-    wkTo = Math.min(WEEKS.length - 1, tIdx >= 0 ? tIdx : WEEKS.length - 1);
+    // Find weeks within the quarter range
+    const qWeeks = WEEKS.reduce((acc, w, i) => {
+      if(w >= from && w <= to) acc.push(i);
+      return acc;
+    }, []);
+    if(qWeeks.length > 0){
+      wkFrom = qWeeks[0];
+      wkTo = qWeeks[qWeeks.length - 1];
+    } else {
+      // No data for this quarter - set to an empty range (same index = 0 weeks shown)
+      wkFrom = 0; wkTo = -1;
+    }
   }
-  // Sync dropdowns
   const selFrom = document.getElementById('wkFrom');
   const selTo = document.getElementById('wkTo');
   if(selFrom) selFrom.value = wkFrom;
