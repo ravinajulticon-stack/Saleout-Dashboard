@@ -652,6 +652,7 @@ async function saveToSupabase(){
     await sb.from('retailers').upsert(retailers);
 
     // 2. Upsert all week_headers in one call
+    normalizeWeekHeaders();
     const wkRows = WEEK_HEADERS.map((h,i) => ({ idx:i, wk:h.wk, date:h.date||'', day:h.day||'' }));
     await sb.from('week_headers').upsert(wkRows);
 
@@ -743,7 +744,7 @@ async function loadFromSupabase(){
       wkHeaders.forEach(h => WEEK_HEADERS.push({ wk:h.wk, date:h.date, day:h.day }));
       WEEKS.length = 0;
       WEEK_HEADERS.forEach(h => WEEKS.push(h.wk));
-      assignWeekYears();
+      normalizeWeekHeaders();
       wkTo = WEEKS.length - 1;
       wkFrom = 0;
     }
@@ -824,6 +825,26 @@ function nextWeekYear(dateStr){
   return year;
 }
 assignWeekYears();
+// Normalize date-month casing (e.g. "09-AUG" -> "09-Aug") and always re-derive
+// day-of-week from the date, so a stale tab or manual typo can't leave the two
+// out of sync. Safe to call as often as needed - it's idempotent.
+function normalizeWeekHeaders(){
+  WEEK_HEADERS.forEach(h=>{
+    if(h.date){
+      const parts = h.date.split('-');
+      if(parts.length===2 && parts[1]){
+        const properMonth = parts[1].charAt(0).toUpperCase() + parts[1].slice(1).toLowerCase();
+        h.date = `${parts[0]}-${properMonth}`;
+      }
+    }
+  });
+  assignWeekYears();
+  WEEK_HEADERS.forEach(h=>{ h.day = getDayFromDate(h.date, h.year); });
+  // keep every section's own column copy in sync too
+  Object.values(SEC_COLS).forEach(cols=>{
+    WEEK_HEADERS.forEach((h,i)=>{ if(cols[i]){ cols[i].date=h.date; cols[i].day=h.day; cols[i].year=h.year; } });
+  });
+}
 const RETAILERS=Object.keys(RAW);
 const COLORS=['#0a84ff','#30d158','#ff9f0a','#ff453a','#bf5af2','#5ac8fa'];
 const SEC_COLORS={'PHILIPS LOCKS SOLD':'#0a84ff','SAMSUNG LOCKS SOLD':'#ff453a','DDL LOCKS SOLD':'#ff9f0a','DDL & ZIG LOCKS SOLD':'#ff9f0a','ZIGBANG LOCKS SOLD':'#bf5af2','PHILIPS SAFES SOLD':'#30d158'};
@@ -1459,10 +1480,15 @@ function addWeekColumn(retailer, secName){
   const nextWk = lastWk + 1;
   const wkName = prompt('Week label:', `WK${nextWk}`) || '';
   if(!wkName.trim()) return;
-  const dateLabel = prompt('Date label (e.g. 5-Jul):', '') || '';
-  const newYear = nextWeekYear(dateLabel.trim());
-  const dayLabel = getDayFromDate(dateLabel.trim(), newYear);
-  const newCol = { wk: wkName.trim(), date: dateLabel.trim(), day: dayLabel, custom: true };
+  let dateLabel = (prompt('Date label (e.g. 5-Jul):', '') || '').trim();
+  // normalize casing immediately (e.g. "09-AUG" / "9-aug" -> "09-Aug")
+  const dlParts = dateLabel.split('-');
+  if(dlParts.length===2 && dlParts[1]){
+    dateLabel = `${dlParts[0]}-${dlParts[1].charAt(0).toUpperCase()}${dlParts[1].slice(1).toLowerCase()}`;
+  }
+  const newYear = nextWeekYear(dateLabel);
+  const dayLabel = getDayFromDate(dateLabel, newYear);
+  const newCol = { wk: wkName.trim(), date: dateLabel, day: dayLabel, custom: true };
 
   // propagate to ALL retailers and ALL sections
   Object.keys(EDIT).forEach(r => {
@@ -1480,7 +1506,7 @@ function addWeekColumn(retailer, secName){
   // also add to the global WEEK_HEADERS and WEEKS so new sections created later include it
   WEEK_HEADERS.push({ ...newCol });
   WEEKS.push(newCol.wk);
-  assignWeekYears();
+  normalizeWeekHeaders();
 
   // refresh the week range selects in Overview toolbar
   refreshWeekSelects();
@@ -1607,6 +1633,13 @@ function updateColLabel(retailer, secName, colIdx, field, val){
   if(!val) return;
   const cols = getSecCols(retailer, secName);
   if(!cols[colIdx]) return;
+
+  // normalize date casing immediately (e.g. "09-AUG" -> "09-Aug")
+  if(field === 'date'){
+    const parts = val.split('-');
+    if(parts.length===2 && parts[1]) val = `${parts[0]}-${parts[1].charAt(0).toUpperCase()}${parts[1].slice(1).toLowerCase()}`;
+  }
+
   cols[colIdx][field] = val;
 
   // Propagate to the global WEEK_HEADERS (this is what actually gets saved to
@@ -1617,8 +1650,9 @@ function updateColLabel(retailer, secName, colIdx, field, val){
   // silently disagrees about this week's label/date
   Object.values(SEC_COLS).forEach(c => { if(c[colIdx]) c[colIdx][field] = val; });
 
-  // Date edits can shift which weeks count as "next calendar year"
-  if(field === 'date') assignWeekYears();
+  // Date edits can shift which weeks count as "next calendar year", and day
+  // must always be re-derived from the (now normalized) date, never trusted stale
+  if(field === 'date') normalizeWeekHeaders();
 
   debouncedSave();
   rebuildAllSectionTables();
