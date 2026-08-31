@@ -832,7 +832,8 @@ function normalizeWeekHeaders(){
   WEEK_HEADERS.forEach(h=>{
     if(h.date){
       const parts = h.date.split('-');
-      if(parts.length===2 && parts[1]){
+      if(parts.length>=2 && parts[1]){
+        // keep only day-month; drop any accidentally-included trailing year segment
         const properMonth = parts[1].charAt(0).toUpperCase() + parts[1].slice(1).toLowerCase();
         h.date = `${parts[0]}-${properMonth}`;
       }
@@ -1481,9 +1482,9 @@ function addWeekColumn(retailer, secName){
   const wkName = prompt('Week label:', `WK${nextWk}`) || '';
   if(!wkName.trim()) return;
   let dateLabel = (prompt('Date label (e.g. 5-Jul):', '') || '').trim();
-  // normalize casing immediately (e.g. "09-AUG" / "9-aug" -> "09-Aug")
+  // normalize casing immediately (e.g. "09-AUG" / "9-aug" -> "09-Aug") and drop any accidental trailing year ("30-Aug-2026" -> "30-Aug")
   const dlParts = dateLabel.split('-');
-  if(dlParts.length===2 && dlParts[1]){
+  if(dlParts.length>=2 && dlParts[1]){
     dateLabel = `${dlParts[0]}-${dlParts[1].charAt(0).toUpperCase()}${dlParts[1].slice(1).toLowerCase()}`;
   }
   const newYear = nextWeekYear(dateLabel);
@@ -1634,10 +1635,10 @@ function updateColLabel(retailer, secName, colIdx, field, val){
   const cols = getSecCols(retailer, secName);
   if(!cols[colIdx]) return;
 
-  // normalize date casing immediately (e.g. "09-AUG" -> "09-Aug")
+  // normalize date casing immediately (e.g. "09-AUG" -> "09-Aug") and drop any accidental trailing year ("30-Aug-2026" -> "30-Aug")
   if(field === 'date'){
     const parts = val.split('-');
-    if(parts.length===2 && parts[1]) val = `${parts[0]}-${parts[1].charAt(0).toUpperCase()}${parts[1].slice(1).toLowerCase()}`;
+    if(parts.length>=2 && parts[1]) val = `${parts[0]}-${parts[1].charAt(0).toUpperCase()}${parts[1].slice(1).toLowerCase()}`;
   }
 
   cols[colIdx][field] = val;
