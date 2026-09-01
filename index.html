@@ -781,6 +781,12 @@ async function loadFromSupabase(){
     Object.keys(EDIT).forEach(k => delete EDIT[k]);
     Object.assign(EDIT, newEdit);
 
+    // Keep RETAILERS in sync with whatever retailers actually exist in Supabase -
+    // it must never stay frozen at the initial fallback dataset's retailer list,
+    // or newly-added retailers silently won't appear in tabs/charts/totals.
+    RETAILERS.length = 0;
+    RETAILERS.push(...Object.keys(newEdit));
+
     // Refresh selects
     refreshWeekSelects();
     setSyncStatus('loaded');
@@ -846,8 +852,8 @@ function normalizeWeekHeaders(){
     WEEK_HEADERS.forEach((h,i)=>{ if(cols[i]){ cols[i].date=h.date; cols[i].day=h.day; cols[i].year=h.year; } });
   });
 }
-const RETAILERS=Object.keys(RAW);
-const COLORS=['#0a84ff','#30d158','#ff9f0a','#ff453a','#bf5af2','#5ac8fa'];
+let RETAILERS=Object.keys(RAW);
+const COLORS=['#0a84ff','#30d158','#ff9f0a','#ff453a','#bf5af2','#5ac8fa','#64d2ff','#ff375f','#ac8e68','#32d74b'];
 const SEC_COLORS={'PHILIPS LOCKS SOLD':'#0a84ff','SAMSUNG LOCKS SOLD':'#ff453a','DDL LOCKS SOLD':'#ff9f0a','DDL & ZIG LOCKS SOLD':'#ff9f0a','ZIGBANG LOCKS SOLD':'#bf5af2','PHILIPS SAFES SOLD':'#30d158'};
 
 let EDIT=JSON.parse(JSON.stringify(RAW));
@@ -1910,6 +1916,7 @@ function addRetailerBlock(){
   const name=prompt('Retailer name:'); if(!name)return;
   if(EDIT[name]){alert('Already exists');return;}
   EDIT[name]={total:0,weeks:[...WEEKS],weekly_totals:new Array(WEEK_HEADERS.length).fill(0),sections:{}};
+  if(!RETAILERS.includes(name)) RETAILERS.push(name);
   renderDetail();
   debouncedSave();
 }
