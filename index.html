@@ -785,7 +785,7 @@ async function loadFromSupabase(){
     // it must never stay frozen at the initial fallback dataset's retailer list,
     // or newly-added retailers silently won't appear in tabs/charts/totals.
     RETAILERS.length = 0;
-    RETAILERS.push(...Object.keys(newEdit));
+    RETAILERS.push(...orderRetailers(Object.keys(newEdit)));
     if(typeof renderRetailerTabs === 'function') renderRetailerTabs();
 
     // Refresh selects
@@ -855,6 +855,39 @@ function normalizeWeekHeaders(){
 }
 let RETAILERS=Object.keys(RAW);
 const COLORS=['#0a84ff','#30d158','#ff9f0a','#ff453a','#bf5af2','#5ac8fa','#64d2ff','#ff375f','#ac8e68','#32d74b'];
+// Single source of truth for retailer colors, keyed by name (not array position),
+// so reordering RETAILERS never shuffles anyone's established color, and a color
+// stays associated with a retailer regardless of where it sits in any list.
+const RETAILER_COLOR_MAP = {
+  'Bunnings': '#0a84ff',
+  'Bing Lee': '#30d158',
+  'Harvey Norman': '#ff9f0a',
+  'Website': '#ff453a',
+  'JB Hi-Fi': '#bf5af2',
+  'Amazon': '#5ac8fa',
+  'Bunnings NZ': '#ffd60a'
+};
+function colorForRetailer(name){
+  if(RETAILER_COLOR_MAP[name]) return RETAILER_COLOR_MAP[name];
+  // stable fallback for any future retailer not yet in the explicit map above
+  let h=0; for(let i=0;i<name.length;i++){ h = Math.imul(31,h)+name.charCodeAt(i)|0; }
+  return COLORS[Math.abs(h)%COLORS.length];
+}
+// Groups a retailer variant (e.g. "Bunnings NZ") directly after its base name
+// ("Bunnings") in display order, wherever it appears in the input list.
+function orderRetailers(names){
+  const arr=[...names], result=[], placed=new Set();
+  arr.forEach(name=>{
+    if(placed.has(name)) return;
+    result.push(name); placed.add(name);
+    arr.forEach(other=>{
+      if(!placed.has(other) && other!==name && other.startsWith(name+' ')){
+        result.push(other); placed.add(other);
+      }
+    });
+  });
+  return result;
+}
 const SEC_COLORS={'PHILIPS LOCKS SOLD':'#0a84ff','SAMSUNG LOCKS SOLD':'#ff453a','DDL LOCKS SOLD':'#ff9f0a','DDL & ZIG LOCKS SOLD':'#ff9f0a','ZIGBANG LOCKS SOLD':'#bf5af2','PHILIPS SAFES SOLD':'#30d158'};
 
 let EDIT=JSON.parse(JSON.stringify(RAW));
@@ -909,9 +942,8 @@ function renderWoW(){
     const pct = prev===0 ? null : Math.round((curr-prev)/prev*100);
     return { r, curr, prev, pct };
   }).sort((a,b) => (b.pct??-999)-(a.pct??-999));
-  const COLORS = {'Bunnings':'#0a84ff','Bing Lee':'#30d158','Harvey Norman':'#ff9f0a','Website':'#ff453a','JB Hi-Fi':'#bf5af2','Amazon':'#64d2ff'};
   document.getElementById('wowBars').innerHTML = rows.map(({r,curr,prev,pct})=>{
-    const color = COLORS[r]||'#6e6e73';
+    const color = colorForRetailer(r);
     const arrow = pct===null?'—':pct>0?`▲ ${pct}%`:pct<0?`▼ ${Math.abs(pct)}%`:'→ 0%';
     const arrowColor = pct===null?'var(--text-3)':pct>0?'#30d158':pct<0?'#ff453a':'var(--text-3)';
     const barW = Math.min(Math.abs(pct||0),100);
@@ -1083,7 +1115,7 @@ function renderTrend(){
   if(trendChart)trendChart.destroy();
   const chartDefaults={responsive:true,maintainAspectRatio:false,plugins:{legend:{display:activeRetailer==='All',labels:{color:'#6e6e73',font:{size:11,family:'Inter'},boxWidth:10,padding:12}},tooltip:{backgroundColor:'rgba(44,44,46,0.95)',titleColor:'#f5f5f7',bodyColor:'#aeaeb2',borderColor:'rgba(255,255,255,0.1)',borderWidth:1,cornerRadius:8,padding:10}},scales:{x:{ticks:{color:'#6e6e73',font:{size:10}},grid:{color:'rgba(255,255,255,0.05)'}},y:{ticks:{color:'#6e6e73',font:{size:10}},grid:{color:'rgba(255,255,255,0.05)'}}}};
   const datasets=activeRetailer==='All'
-    ?RETAILERS.map((r,i)=>({label:r,data:getWeekSlice(getWeeklyTotals(r)),borderColor:COLORS[i],backgroundColor:COLORS[i]+'18',borderWidth:1.5,pointRadius:2,tension:0.4,fill:false}))
+    ?RETAILERS.map((r)=>({label:r,data:getWeekSlice(getWeeklyTotals(r)),borderColor:colorForRetailer(r),backgroundColor:colorForRetailer(r)+'18',borderWidth:1.5,pointRadius:2,tension:0.4,fill:false}))
     :[{label:activeRetailer,data:getWeekSlice(getWeeklyTotals(activeRetailer)),borderColor:'#0a84ff',backgroundColor:'rgba(10,132,255,0.1)',borderWidth:2,pointRadius:3,tension:0.4,fill:true}];
   trendChart=new Chart(ctx,{type:'line',data:{labels,datasets},options:chartDefaults});
 }
@@ -1094,7 +1126,7 @@ function renderShare(){
   document.getElementById('shareBars').innerHTML=RETAILERS.map((r,i)=>{
     const tot=EDIT[r]?EDIT[r].total:0;
     const pct=grand>0?Math.round(tot/grand*100):0;
-    return `<div class="share-row"><div class="share-name">${r}</div><div class="share-track"><div class="share-fill" style="width:${pct}%;background:${COLORS[i]}"></div></div><div class="share-num" style="color:${COLORS[i]}">${tot.toLocaleString()}</div></div>`;
+    return `<div class="share-row"><div class="share-name">${r}</div><div class="share-track"><div class="share-fill" style="width:${pct}%;background:${colorForRetailer(r)}"></div></div><div class="share-num" style="color:${colorForRetailer(r)}">${tot.toLocaleString()}</div></div>`;
   }).join('');
 }
 
@@ -1375,24 +1407,25 @@ function renderSparks(){
   // destroy old Chart.js instances
   Object.keys(sparkCharts).forEach(r=>{ if(sparkCharts[r]&&sparkCharts[r].destroy) sparkCharts[r].destroy(); });
 
-  RETAILERS.forEach((r,i)=>{
+  RETAILERS.forEach((r)=>{
     const totals=getWeekSlice(getWeeklyTotals(r));
     const peak=Math.max(...totals.filter(v=>v>0),0);
     const peakWk=WEEKS[wkFrom+totals.indexOf(peak)]||'';
+    const rColor=colorForRetailer(r);
     const card=document.createElement('div');
     card.className='spark-card';
     card.innerHTML=`
       <div class="spark-top">
         <div style="min-width:0;flex:1;overflow:hidden">
           <div class="spark-name">${r}</div>
-          <div class="spark-total" style="color:${COLORS[i]}">${Object.values(EDIT[r]?.sections||{}).reduce((s,sec)=>s+sec.products.reduce((ps,p)=>ps+p.weekly.slice(wkFrom,wkTo+1).reduce((a,b)=>a+b,0),0),0).toLocaleString()}</div>
+          <div class="spark-total" style="color:${rColor}">${Object.values(EDIT[r]?.sections||{}).reduce((s,sec)=>s+sec.products.reduce((ps,p)=>ps+p.weekly.slice(wkFrom,wkTo+1).reduce((a,b)=>a+b,0),0),0).toLocaleString()}</div>
         </div>
         <div class="spark-peak">
-          <div class="spark-peak-val" style="color:${COLORS[i]}">${peak}</div>
+          <div class="spark-peak-val" style="color:${rColor}">${peak}</div>
           <div class="spark-peak-wk">${peakWk}</div>
         </div>
       </div>
-      <div class="spark-canvas">${makeSVGSpark(totals,COLORS[i])}</div>`;
+      <div class="spark-canvas">${makeSVGSpark(totals,rColor)}</div>`;
     grid.appendChild(card);
   });
 }
@@ -1921,7 +1954,12 @@ function addRetailerBlock(){
   const name=prompt('Retailer name:'); if(!name)return;
   if(EDIT[name]){alert('Already exists');return;}
   EDIT[name]={total:0,weeks:[...WEEKS],weekly_totals:new Array(WEEK_HEADERS.length).fill(0),sections:{}};
-  if(!RETAILERS.includes(name)) RETAILERS.push(name);
+  if(!RETAILERS.includes(name)){
+    RETAILERS.push(name);
+    const ordered = orderRetailers(RETAILERS);
+    RETAILERS.length = 0;
+    RETAILERS.push(...ordered);
+  }
   if(typeof renderRetailerTabs === 'function') renderRetailerTabs();
   renderDetail();
   debouncedSave();
@@ -1929,8 +1967,7 @@ function addRetailerBlock(){
 
 function renderRetailerBlock(container, retailer){
   const rd=EDIT[retailer];
-  const rIdx=RETAILERS.indexOf(retailer);
-  const color=COLORS[rIdx]||'#0a84ff';
+  const color=colorForRetailer(retailer);
   if(activeRetailer==='All'){
     const h=document.createElement('div'); h.className='ret-heading';
     h.innerHTML=`<span class="ret-heading-name" style="color:${color}">${retailer}</span><div class="ret-heading-right"><span class="ret-total-badge" style="background:${color}">${Object.values(rd.sections||{}).reduce((s,sec)=>s+sec.products.reduce((ps,p)=>ps+p.weekly.reduce((a,b)=>a+b,0),0),0).toLocaleString()}</span><button class="ic-btn btn-add" onclick="addSection('${retailer}')">+ Section</button></div>`;
