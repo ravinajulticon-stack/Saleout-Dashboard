@@ -786,6 +786,7 @@ async function loadFromSupabase(){
     // or newly-added retailers silently won't appear in tabs/charts/totals.
     RETAILERS.length = 0;
     RETAILERS.push(...Object.keys(newEdit));
+    if(typeof renderRetailerTabs === 'function') renderRetailerTabs();
 
     // Refresh selects
     refreshWeekSelects();
@@ -1024,13 +1025,17 @@ selTo.addEventListener('change',()=>{wkTo=+selTo.value;document.querySelectorAll
 
 /* ── retailer tabs ── */
 const tabsEl=document.getElementById('retailerTabs');
-['All',...RETAILERS].forEach(r=>{
-  const b=document.createElement('button');
-  b.className='pill'+(r==='All'?' active':'');
-  b.textContent=r;
-  b.onclick=()=>{activeRetailer=r;activeType='ALL';activeBrand='ALL';activeSeries='ALL';activeProduct='ALL';document.querySelectorAll('.pill').forEach(t=>t.classList.remove('active'));b.classList.add('active');renderAll();};
-  tabsEl.appendChild(b);
-});
+function renderRetailerTabs(){
+  tabsEl.innerHTML='';
+  ['All',...RETAILERS].forEach(r=>{
+    const b=document.createElement('button');
+    b.className='pill'+(r===activeRetailer?' active':'');
+    b.textContent=r;
+    b.onclick=()=>{activeRetailer=r;activeType='ALL';activeBrand='ALL';activeSeries='ALL';activeProduct='ALL';document.querySelectorAll('.pill').forEach(t=>t.classList.remove('active'));b.classList.add('active');renderAll();};
+    tabsEl.appendChild(b);
+  });
+}
+renderRetailerTabs();
 
 /* ── view toggle ── */
 function switchView(v,btn){
@@ -1917,6 +1922,7 @@ function addRetailerBlock(){
   if(EDIT[name]){alert('Already exists');return;}
   EDIT[name]={total:0,weeks:[...WEEKS],weekly_totals:new Array(WEEK_HEADERS.length).fill(0),sections:{}};
   if(!RETAILERS.includes(name)) RETAILERS.push(name);
+  if(typeof renderRetailerTabs === 'function') renderRetailerTabs();
   renderDetail();
   debouncedSave();
 }
