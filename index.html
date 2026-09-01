@@ -648,7 +648,7 @@ async function saveToSupabase(){
   try {
     // 1. Upsert all retailers in one call
     const retailers = Object.keys(EDIT).map(name => ({
-      id: name.toLowerCase().replace(/[^a-z0-9]/g,'_'),
+      id: retailerIdFor(name),
       name, total: EDIT[name].total
     }));
     await sb.from('retailers').upsert(retailers);
@@ -664,7 +664,7 @@ async function saveToSupabase(){
     const allSales = [];
 
     for(const [rName, rd] of Object.entries(EDIT)){
-      const rId = rName.toLowerCase().replace(/[^a-z0-9]/g,'_');
+      const rId = retailerIdFor(rName);
       let secIdx=0; for(const [secName, sec] of Object.entries(rd.sections)){
         const secId = rId+'__'+secName.toLowerCase().replace(/[^a-z0-9]/g,'_');
         allSections.push({ id:secId, retailer_id:rId, name:secName, total:sec.total, sort_order:secIdx });
@@ -754,7 +754,7 @@ async function loadFromSupabase(){
     // Rebuild EDIT
     const newEdit = {};
     retailers.forEach(r => {
-      newEdit[r.name] = { total: r.total, weekly_totals: new Array(WEEK_HEADERS.length).fill(0), weeks: [...WEEKS], sections: {} };
+      newEdit[r.name] = { id: r.id, total: r.total, weekly_totals: new Array(WEEK_HEADERS.length).fill(0), weeks: [...WEEKS], sections: {} };
     });
 
     sections.forEach(sec => {
@@ -862,6 +862,7 @@ const COLORS=['#0a84ff','#30d158','#ff9f0a','#ff453a','#bf5af2','#5ac8fa','#64d2
 // stays associated with a retailer regardless of where it sits in any list.
 const RETAILER_COLOR_MAP = {
   'Bunnings': '#0a84ff',
+  'Bunnings AU': '#0a84ff',
   'Bing Lee': '#30d158',
   'Harvey Norman': '#ff9f0a',
   'Website': '#ff453a',
@@ -869,6 +870,15 @@ const RETAILER_COLOR_MAP = {
   'Amazon': '#5ac8fa',
   'Bunnings NZ': '#ffd60a'
 };
+// Reuse a retailer's stable Supabase ID if we already know it (set on load from the
+// retailers table), instead of always re-deriving from the current name. This is what
+// makes renaming a retailer safe: sections/products/weekly_sales are all keyed off this
+// ID, not the display name, so as long as the ID doesn't change, a rename is just a label
+// update rather than forking every row underneath it onto a new ID.
+function retailerIdFor(name){
+  if(EDIT[name] && EDIT[name].id) return EDIT[name].id;
+  return name.toLowerCase().replace(/[^a-z0-9]/g,'_');
+}
 function colorForRetailer(name){
   if(RETAILER_COLOR_MAP[name]) return RETAILER_COLOR_MAP[name];
   // stable fallback for any future retailer not yet in the explicit map above
@@ -879,11 +889,14 @@ function colorForRetailer(name){
 // ("Bunnings") in display order, wherever it appears in the input list.
 function orderRetailers(names){
   const arr=[...names], result=[], placed=new Set();
+  const firstWord = n => n.split(' ')[0];
   arr.forEach(name=>{
     if(placed.has(name)) return;
     result.push(name); placed.add(name);
+    // group any other retailer sharing the same first word (e.g. "Bunnings AU" / "Bunnings NZ")
+    // directly after this one, so a rename doesn't break the grouping
     arr.forEach(other=>{
-      if(!placed.has(other) && other!==name && other.startsWith(name+' ')){
+      if(!placed.has(other) && other!==name && firstWord(other)===firstWord(name)){
         result.push(other); placed.add(other);
       }
     });
@@ -1932,7 +1945,7 @@ function addProduct(retailer, secName){
 }
 function removeSection(retailer, secName){
   if(!confirm(`Remove "${secName}"?`))return;
-  const rId = retailer.toLowerCase().replace(/\s/g,'_');
+  const rId = retailerIdFor(retailer);
   const secId = rId+'__'+secName.toLowerCase().replace(/[^a-z0-9]/g,'_');
   delete EDIT[retailer].sections[secName];
   renderDetail();
