@@ -1065,7 +1065,7 @@ function renderKpis(){
     else ddl+=t;
   }));
   document.getElementById('kpiStrip').innerHTML=`
-    <div class="kpi-item"><div class="kpi-label">Total Units</div><div class="kpi-val blue">${grand.toLocaleString()}</div><div class="kpi-sub">${activeRetailer==='All'?'6 retailers':activeRetailer}</div></div>
+    <div class="kpi-item"><div class="kpi-label">Total Units</div><div class="kpi-val blue">${grand.toLocaleString()}</div><div class="kpi-sub">${activeRetailer==='All'?RETAILERS.length+' retailers':activeRetailer}</div></div>
     <div class="kpi-item"><div class="kpi-label">Avg Weekly</div><div class="kpi-val">${avg.toLocaleString()}</div><div class="kpi-sub">active weeks</div></div>
     <div class="kpi-item"><div class="kpi-label">Peak Week</div><div class="kpi-val green">${peak.toLocaleString()}</div><div class="kpi-sub">${peakWk}</div></div>
     <div class="kpi-item"><div class="kpi-label">Philips Locks</div><div class="kpi-val">${plocks.toLocaleString()}</div><div class="kpi-sub">${grand>0?Math.round(plocks/grand*100):0}% of total</div></div>
