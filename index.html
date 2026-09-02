@@ -887,10 +887,13 @@ function colorForRetailer(name){
 }
 // Groups a retailer variant (e.g. "Bunnings NZ") directly after its base name
 // ("Bunnings") in display order, wherever it appears in the input list.
+// Retailer-name-first-words that should always lead the list (in this order),
+// with any same-first-word variant (e.g. "Bunnings NZ") grouped right after.
+const PINNED_RETAILER_GROUPS = ['Bunnings'];
 function orderRetailers(names){
   const arr=[...names], result=[], placed=new Set();
   const firstWord = n => n.split(' ')[0];
-  arr.forEach(name=>{
+  function addGroup(name){
     if(placed.has(name)) return;
     result.push(name); placed.add(name);
     // group any other retailer sharing the same first word (e.g. "Bunnings AU" / "Bunnings NZ")
@@ -900,7 +903,14 @@ function orderRetailers(names){
         result.push(other); placed.add(other);
       }
     });
+  }
+  // Pin priority groups to the very front first
+  PINNED_RETAILER_GROUPS.forEach(word=>{
+    const candidates = arr.filter(n=>firstWord(n)===word).sort();
+    if(candidates.length) addGroup(candidates[0]);
   });
+  // Then everything else, in original order
+  arr.forEach(addGroup);
   return result;
 }
 const SEC_COLORS={'PHILIPS LOCKS SOLD':'#0a84ff','SAMSUNG LOCKS SOLD':'#ff453a','DDL LOCKS SOLD':'#ff9f0a','DDL & ZIG LOCKS SOLD':'#ff9f0a','ZIGBANG LOCKS SOLD':'#bf5af2','PHILIPS SAFES SOLD':'#30d158'};
