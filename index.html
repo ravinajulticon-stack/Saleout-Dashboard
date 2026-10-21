@@ -89,35 +89,42 @@ body {
   flex-wrap: wrap;
 }
 
-/* macOS segmented control */
-.seg-ctrl {
+/* header view tabs */
+.nav-sep { width: 1px; height: 28px; background: var(--border-strong); flex-shrink: 0; }
+.nav-tabs { display: flex; align-self: stretch; align-items: stretch; }
+.nav-tab {
   display: flex;
-  background: var(--surface-1);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
-  padding: 2px;
-  gap: 1px;
-}
-.seg-btn {
-  padding: 5px 14px;
-  border-radius: 6px;
+  align-items: center;
+  gap: 10px;
+  padding: 0 20px;
   border: none;
+  border-bottom: 2px solid transparent;
   background: transparent;
   color: var(--text-2);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   font-family: inherit;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
   white-space: nowrap;
 }
-.seg-btn.active {
-  background: var(--surface-3);
-  color: var(--text);
-  font-weight: 600;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+.nav-tab:hover:not(.active) { color: var(--text); background: rgba(255,255,255,0.04); }
+.nav-tab.active { color: var(--text); font-weight: 600; border-bottom-color: var(--blue); }
+.nav-tab + .nav-tab { border-left: 1px solid var(--border-strong); }
+.nav-badge {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  flex-shrink: 0;
 }
-.seg-btn:hover:not(.active) { color: var(--text); background: rgba(255,255,255,0.05); }
+@media (max-width: 640px) {
+  .nav-badge { display: none; }
+  .nav-tab { padding: 0 12px; }
+}
 
 /* retailer pills */
 .pill-group { display: flex; gap: 5px; flex-wrap: wrap; }
@@ -490,17 +497,26 @@ body {
     </svg>
     <span class="brand-name">Saleout</span>
   </div>
+  <div class="nav-sep"></div>
+  <nav class="nav-tabs" aria-label="Views">
+    <button class="nav-tab active" aria-current="page" onclick="switchView('overview',this)">
+      <span class="nav-badge" style="background:var(--blue)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+      </span>
+      Overview
+    </button>
+    <button class="nav-tab" onclick="switchView('detail',this)">
+      <span class="nav-badge" style="background:var(--amber)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/><path d="M9 4v16"/></svg>
+      </span>
+      Detail Table
+    </button>
+  </nav>
   <div id="syncStatus" style="margin-left:auto;min-width:44px;font-size:11px;font-weight:600;text-align:right;color:var(--text-3)"></div>
 </div>
 
 <!-- TOOLBAR -->
 <div class="toolbar">
-  <!-- view toggle -->
-  <div class="seg-ctrl">
-    <button class="seg-btn active" onclick="switchView('overview',this)">Overview</button>
-    <button class="seg-btn" onclick="switchView('detail',this)">Detail Table</button>
-  </div>
-  <div class="toolbar-sep"></div>
   <!-- retailer pills -->
   <div class="pill-group" id="retailerTabs"></div>
   <div class="toolbar-sep"></div>
@@ -1101,7 +1117,7 @@ renderRetailerTabs();
 /* ── view toggle ── */
 function switchView(v,btn){
   currentView=v;
-  document.querySelectorAll('.seg-btn').forEach(t=>t.classList.remove('active'));btn.classList.add('active');
+  document.querySelectorAll('.nav-tab').forEach(t=>{t.classList.remove('active');t.removeAttribute('aria-current');});btn.classList.add('active');btn.setAttribute('aria-current','page');
   document.getElementById('overviewView').style.display=v==='overview'?'block':'none';
   document.getElementById('detailView').style.display=v==='detail'?'block':'none';
   document.getElementById('wkRangeCtrl').style.display=v==='overview'?'flex':'none';
