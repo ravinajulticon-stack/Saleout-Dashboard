@@ -82,11 +82,32 @@ body {
   background: rgba(44,44,46,0.7);
   backdrop-filter: var(--blur);
   border-bottom: 1px solid var(--border);
-  padding: 10px 20px;
+  padding: 12px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+.tb-section { display: flex; align-items: flex-start; gap: 16px; }
+.tb-section + .tb-section { border-top: 1px solid var(--border); padding-top: 10px; }
+.tb-section > .pill-group { flex: 1; min-width: 0; }
+.tb-title {
+  width: 76px;
+  height: 28px;
   display: flex;
   align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.tb-body { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; min-height: 28px; }
+.tb-group { display: flex; align-items: center; gap: 6px; }
+@media (max-width: 700px) {
+  .tb-section { flex-direction: column; gap: 6px; }
+  .tb-title { width: auto; height: auto; }
 }
 
 /* header view tabs */
@@ -517,37 +538,50 @@ body {
 
 <!-- TOOLBAR -->
 <div class="toolbar">
-  <!-- retailer pills -->
-  <div class="pill-group" id="retailerTabs"></div>
-  <div class="toolbar-sep"></div>
-  <!-- week range (overview only) -->
-  <div class="wk-range" id="wkRangeCtrl">
-    <div id="quarterBtns" style="display:flex;gap:4px;margin-right:10px">
-      <button class="qtr-btn" onclick="setQuarter(1)">Q1</button>
-      <button class="qtr-btn" onclick="setQuarter(2)">Q2</button>
-      <button class="qtr-btn" onclick="setQuarter(3)">Q3</button>
-      <button class="qtr-btn" onclick="setQuarter(4)">Q4</button>
-      <button class="qtr-btn" onclick="setQuarter(0)">All</button>
+  <!-- retailers -->
+  <div class="tb-section">
+    <div class="tb-title">Retailers</div>
+    <div class="pill-group" id="retailerTabs"></div>
+  </div>
+  <!-- filters (overview only) -->
+  <div class="tb-section" id="wkRangeCtrl">
+    <div class="tb-title">Filters</div>
+    <div class="tb-body">
+      <div class="tb-group">
+        <span class="wk-label">Quarter</span>
+        <div id="quarterBtns" style="display:flex;gap:4px">
+          <button class="qtr-btn" onclick="setQuarter(1)">Q1</button>
+          <button class="qtr-btn" onclick="setQuarter(2)">Q2</button>
+          <button class="qtr-btn" onclick="setQuarter(3)">Q3</button>
+          <button class="qtr-btn" onclick="setQuarter(4)">Q4</button>
+          <button class="qtr-btn" onclick="setQuarter(0)">All</button>
+        </div>
+      </div>
+      <div class="toolbar-sep"></div>
+      <div class="tb-group">
+        <span class="wk-label">From</span>
+        <select class="wk-sel" id="wkFrom" style="min-width:110px"></select>
+        <span class="wk-label">To</span>
+        <select class="wk-sel" id="wkTo" style="min-width:110px"></select>
+      </div>
+      <div class="toolbar-sep"></div>
+      <div class="tb-group">
+        <span class="wk-label">Brand</span>
+        <select class="wk-sel" id="brandFilterSel" style="min-width:120px" onchange="setActiveBrand(this.value)">
+          <option value="ALL">All Brands</option>
+        </select>
+        <span class="wk-label">Type</span>
+        <select class="wk-sel" id="typeFilterSel" style="min-width:110px" onchange="setActiveType(this.value)">
+          <option value="ALL">All Types</option>
+        </select>
+        <span class="wk-label" id="productFilterLabel" style="display:none">Product</span>
+        <select class="wk-sel" id="productFilterSel" style="min-width:130px;display:none" onchange="if(!_skipProductChange)setActiveProduct(this.value)">
+          <option value="ALL">All Products</option>
+        </select>
+      </div>
     </div>
-    <span class="wk-label">From</span>
-    <select class="wk-sel" id="wkFrom" style="min-width:110px"></select>
-    <span class="wk-label">to</span>
-    <select class="wk-sel" id="wkTo" style="min-width:110px"></select>
-    <span class="wk-label" style="margin-left:10px">Brand</span>
-    <select class="wk-sel" id="brandFilterSel" style="min-width:120px" onchange="setActiveBrand(this.value)">
-      <option value="ALL">All Brands</option>
-    </select>
-    <span class="wk-label" style="margin-left:10px">Type</span>
-    <select class="wk-sel" id="typeFilterSel" style="min-width:110px" onchange="setActiveType(this.value)">
-      <option value="ALL">All Types</option>
-    </select>
-    <span class="wk-label" id="productFilterLabel" style="margin-left:10px;display:none">Product</span>
-    <select class="wk-sel" id="productFilterSel" style="min-width:130px;display:none" onchange="if(!_skipProductChange)setActiveProduct(this.value)">
-      <option value="ALL">All Products</option>
-    </select>
   </div>
 </div>
-
 <!-- MAIN -->
 <div class="main">
 
