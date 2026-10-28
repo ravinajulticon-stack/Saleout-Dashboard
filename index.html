@@ -1122,6 +1122,40 @@ let _lastWeekCount;
 // Sum of a weekly array over the selected From/To range (Detail Table totals follow the chosen weeks)
 function rangeSum(arr){ return arr.slice(Math.max(wkFrom,0), wkTo+1).reduce((a,b)=>a+b,0); }
 
+// Brand and Type filters on the Detail Table (shared with the Overview). Brand is the section name without " SOLD".
+function typeMatches(p){
+  if(activeType==='ALL') return true;
+  const t = p.type || 'Unknown';
+  return activeType==='Safes' ? SAFE_SERIES.includes(t) : t===activeType;
+}
+function brandMatches(secName){ return activeBrand==='ALL' || secName.replace(' SOLD','')===activeBrand; }
+function visProds(secName, prods){ return brandMatches(secName) ? prods.filter(typeMatches) : []; }
+function retailerRangeTotal(rd){
+  const secs=(rd&&rd.sections)||{};
+  return Object.entries(secs).reduce((s,[sn,sec])=>s+visProds(sn,sec.products).reduce((ps,p)=>ps+rangeSum(p.weekly),0),0);
+}
+function allRangeTotal(){ return Object.values(EDIT).reduce((s,rd)=>s+retailerRangeTotal(rd),0); }
+
+// Fill the Brand and Type dropdowns for the Detail Table (the Overview does this in renderTypeChart)
+function syncDetailFilterOptions(){
+  const retailers = activeRetailer==='All' ? Object.keys(EDIT) : [activeRetailer];
+  const allProds = [];
+  retailers.forEach(r=>Object.entries((EDIT[r]&&EDIT[r].sections)||{}).forEach(([secName,sec])=>sec.products.forEach(p=>allProds.push({type:p.type, secName}))));
+  const allBrands = [...new Set(allProds.map(p=>p.secName.replace(' SOLD','')))].sort();
+  const brandSel = document.getElementById('brandFilterSel');
+  if(!allBrands.includes(activeBrand)) activeBrand = 'ALL';
+  if(brandSel) brandSel.innerHTML = '<option value="ALL">All Brands</option>' + allBrands.map(b=>`<option value="${b}"${b===activeBrand?' selected':''}>${b}</option>`).join('');
+  const brandFiltered = activeBrand==='ALL' ? allProds : allProds.filter(p=>p.secName.replace(' SOLD','')===activeBrand);
+  const rawTypes = [...new Set(brandFiltered.map(p=>p.type||'Unknown'))].sort();
+  const hasSafes = rawTypes.some(t=>SAFE_SERIES.includes(t));
+  const allTypes = rawTypes.filter(t=>!SAFE_SERIES.includes(t));
+  if(hasSafes) allTypes.push('Safes');
+  allTypes.sort();
+  const typeSel = document.getElementById('typeFilterSel');
+  if(!allTypes.includes(activeType) && activeType!=='ALL') activeType = 'ALL';
+  if(typeSel) typeSel.innerHTML = '<option value="ALL">All Types</option>' + allTypes.map(t=>`<option value="${t}"${t===activeType?' selected':''}>${t}</option>`).join('');
+}
+
 function applyDetailWeekFilter(){
   let st = document.getElementById('wkFilterStyle');
   if(!st){ st = document.createElement('style'); st.id = 'wkFilterStyle'; document.head.appendChild(st); }
@@ -1181,10 +1215,13 @@ function switchView(v,btn){
   document.querySelectorAll('.nav-tab').forEach(t=>{t.classList.remove('active');t.removeAttribute('aria-current');});btn.classList.add('active');btn.setAttribute('aria-current','page');
   document.getElementById('overviewView').style.display=v==='overview'?'block':'none';
   document.getElementById('detailView').style.display=v==='detail'?'block':'none';
-  // Quarter and week range apply to both views; Brand and Type only apply to the overview charts
+  // Quarter, week range, Brand and Type apply to both views
   document.getElementById('wkRangeCtrl').style.display='flex';
-  document.getElementById('brandTypeGroup').style.display=v==='overview'?'flex':'none';
-  document.getElementById('brandTypeSep').style.display=v==='overview'?'':'none';
+  document.getElementById('brandTypeGroup').style.display='flex';
+  document.getElementById('brandTypeSep').style.display='';
+  if(v==='detail'){ // the Product dropdown only applies to the Overview chart
+    ['productFilterLabel','productFilterSel'].forEach(id=>{ const e=document.getElementById(id); if(e) e.style.display='none'; });
+  }
   applyDetailWeekFilter();
   renderAll();
 }
@@ -1483,13 +1520,13 @@ function setActiveBrand(b){
   const pLbl=document.getElementById('productFilterLabel');
   if(pSel) pSel.style.display='none';
   if(pLbl) pLbl.style.display='none';
-  renderTypeChart();
+  if(currentView==='detail') renderDetail(); else renderTypeChart();
 }
 function setActiveType(t){
   activeType=t; activeSeries='ALL'; activeProduct='ALL';
   const sel=document.getElementById('typeFilterSel');
   if(sel) sel.value=t;
-  renderTypeChart();
+  if(currentView==='detail') renderDetail(); else renderTypeChart();
 }
 
 /* ── sparklines ── */
@@ -1578,7 +1615,7 @@ function updateTotalCells(retailer, secName){
     if(wkTotalRow){
       const cols=getSecCols(retailer,secName);
       const wt=new Array(cols.length).fill(0);
-      sec.products.forEach(p=>{ const wk=p.weekly.slice(0,cols.length); wk.forEach((v,i)=>wt[i]+=(v||0)); });
+      visProds(secName,sec.products).forEach(p=>{ const wk=p.weekly.slice(0,cols.length); wk.forEach((v,i)=>wt[i]+=(v||0)); });
       const tds=wkTotalRow.querySelectorAll('td');
       if(tds[1]) tds[1].textContent=wt.slice(wkFrom,wkTo+1).reduce((a,b)=>a+b,0)||'—';
       wt.forEach((v,i)=>{ if(tds[i+2]) tds[i+2].textContent=v||'—'; });
@@ -1586,7 +1623,7 @@ function updateTotalCells(retailer, secName){
   }
   // update section total badge
   const totalEl=document.getElementById(`st_${sid}`);
-  if(totalEl){ const t=sec.products.reduce((s,p)=>s+rangeSum(p.weekly),0); totalEl.textContent=t>0?t.toLocaleString():'—'; }
+  if(totalEl){ const t=visProds(secName,sec.products).reduce((s,p)=>s+rangeSum(p.weekly),0); totalEl.textContent=t>0?t.toLocaleString():'—'; }
   refreshDetailHeader();
 }
 
@@ -1679,7 +1716,7 @@ function addWeekColumn(retailer, secName){
     const retailer = nameEl.textContent.trim();
     const rd = EDIT[retailer];
     if(!rd) return;
-    const total = Object.values(rd.sections||{}).reduce((s,sec)=>s+sec.products.reduce((ps,p)=>ps+rangeSum(p.weekly),0),0);
+    const total = retailerRangeTotal(rd);
     badge.textContent = total.toLocaleString();
   });
 
@@ -1873,10 +1910,11 @@ function renderTbody(tbody, retailer, secName, secData, secColor){
   const prods=secData.products;
   const cols=getSecCols(retailer, secName);
   const nCols=cols.length;
-  const maxProd=Math.max(...prods.map(p=>rangeSum(p.weekly)),1);
+  const visList=visProds(secName,prods);
+  const maxProd=Math.max(...visList.map(p=>rangeSum(p.weekly)),1);
   const sortMode=SEC_SORT[retailer+'__'+secName]||null;
   const rowTotals=prods.map(p=>rangeSum(p.weekly));
-  const order=prods.map((_,i)=>i);
+  const order=prods.map((_,i)=>i).filter(i=>typeMatches(prods[i]));
   if(sortMode) order.sort((a,b)=>(sortMode==='desc'?rowTotals[b]-rowTotals[a]:rowTotals[a]-rowTotals[b])||(a-b));
   order.forEach((pIdx,dIdx)=>{
     const p=prods[pIdx];
@@ -1960,7 +1998,7 @@ function renderTbody(tbody, retailer, secName, secData, secColor){
   });
   // weekly total row
   const wt=new Array(nCols).fill(0);
-  prods.forEach(p=>{ const wk=p.weekly.slice(0,nCols); wk.forEach((v,i)=>wt[i]+=(v||0)); });
+  visList.forEach(p=>{ const wk=p.weekly.slice(0,nCols); wk.forEach((v,i)=>wt[i]+=(v||0)); });
   const ttr=document.createElement('tr'); ttr.className='wk-total-row';
   ttr.innerHTML=`<td class="col-num"></td><td class="col-name">Weekly Total</td><td class="col-type"></td><td class="col-total">${wt.slice(wkFrom,wkTo+1).reduce((a,b)=>a+b,0)||'—'}</td>`;
   wt.forEach((v,i)=>{ const td=document.createElement('td'); td.dataset.w=i; td.textContent=v||'—'; ttr.appendChild(td); });
@@ -1974,7 +2012,7 @@ function buildSectionBlock(retailer, secName, secData, secColor){
   const sid=`sb_${retailer}_${secName}`.replace(/[^a-z0-9]/gi,'_');
   // header
   const hd=document.createElement('div'); hd.className='sec-hd';
-  hd.innerHTML=`<span class="sec-hd-name" style="color:${secColor}" contenteditable="true" spellcheck="false" onblur="renameSectionFromEl(this,'${retailer}','${secName}')">${secName}</span><div class="sec-hd-right"><span class="sec-total" style="color:${secColor}" id="st_${sid}">${(()=>{const t=secData.products.reduce((s,p)=>s+rangeSum(p.weekly),0);return t>0?t.toLocaleString():'—';})()}</span><button class="ic-btn btn-del" onclick="removeSection('${retailer}','${secName}')" title="Remove section">✕</button></div>`;
+  hd.innerHTML=`<span class="sec-hd-name" style="color:${secColor}" contenteditable="true" spellcheck="false" onblur="renameSectionFromEl(this,'${retailer}','${secName}')">${secName}</span><div class="sec-hd-right"><span class="sec-total" style="color:${secColor}" id="st_${sid}">${(()=>{const t=visProds(secName,secData.products).reduce((s,p)=>s+rangeSum(p.weekly),0);return t>0?t.toLocaleString():'—';})()}</span><button class="ic-btn btn-del" onclick="removeSection('${retailer}','${secName}')" title="Remove section">✕</button></div>`;
   block.appendChild(hd);
   // scroll+table
   const scroll=document.createElement('div'); scroll.className='tbl-scroll';
@@ -2043,24 +2081,24 @@ function refreshSection(retailer, secName){
   const tbody=document.getElementById(`tb_${sid}`);
   if(tbody)renderTbody(tbody,retailer,secName,sd,sc);
   const st=document.getElementById(`st_${sid}`);
-  if(st){ const _t=sd.products.reduce((s,p)=>s+rangeSum(p.weekly),0); st.textContent=_t>0?_t.toLocaleString():'—'; }
+  if(st){ const _t=visProds(secName,sd.products).reduce((s,p)=>s+rangeSum(p.weekly),0); st.textContent=_t>0?_t.toLocaleString():'—'; }
   refreshDetailHeader();
 }
 
 function refreshDetailHeader(){
   if(activeRetailer==='All'){
-    const grand=Object.values(EDIT).reduce((s,rd)=>s+Object.values(rd.sections||{}).reduce((ss,sec)=>ss+sec.products.reduce((ps,p)=>ps+rangeSum(p.weekly),0),0),0);
+    const grand=allRangeTotal();
     document.getElementById('detailTotalBadge').textContent=grand.toLocaleString();
   } else {
     const _rd=EDIT[activeRetailer];
-    document.getElementById('detailTotalBadge').textContent=Object.values(_rd?.sections||{}).reduce((s,sec)=>s+sec.products.reduce((ps,p)=>ps+rangeSum(p.weekly),0),0).toLocaleString();
+    document.getElementById('detailTotalBadge').textContent=retailerRangeTotal(_rd).toLocaleString();
   }
 }
 
 function addProduct(retailer, secName){
   const p={name:'New Product',total:0,weekly:new Array(WEEK_HEADERS.length).fill(0),id:uid('p_')};
   EDIT[retailer].sections[secName].products.push(p);
-  refreshSection(retailer,secName);
+  if(activeType!=='ALL'){ activeType='ALL'; renderDetail(); } else refreshSection(retailer,secName);
   debouncedSave();
 }
 function removeSection(retailer, secName){
@@ -2103,31 +2141,39 @@ function addRetailerBlock(){
 function renderRetailerBlock(container, retailer){
   const rd=EDIT[retailer];
   const color=colorForRetailer(retailer);
+  const _filtered=activeBrand!=='ALL'||activeType!=='ALL';
+  const _secs=Object.entries(rd.sections).filter(([sn,sd])=>!_filtered||visProds(sn,sd.products).length>0);
+  if(_filtered && _secs.length===0 && activeRetailer==='All') return;
   if(activeRetailer==='All'){
     const h=document.createElement('div'); h.className='ret-heading';
-    h.innerHTML=`<span class="ret-heading-name" style="color:${color}">${retailer}</span><div class="ret-heading-right"><span class="ret-total-badge" style="background:${color}">${Object.values(rd.sections||{}).reduce((s,sec)=>s+sec.products.reduce((ps,p)=>ps+rangeSum(p.weekly),0),0).toLocaleString()}</span><button class="ic-btn btn-add" onclick="addSection('${retailer}')">+ Section</button></div>`;
+    h.innerHTML=`<span class="ret-heading-name" style="color:${color}">${retailer}</span><div class="ret-heading-right"><span class="ret-total-badge" style="background:${color}">${retailerRangeTotal(rd).toLocaleString()}</span><button class="ic-btn btn-add" onclick="addSection('${retailer}')">+ Section</button></div>`;
     container.appendChild(h);
   }
-  Object.entries(rd.sections).forEach(([secName,secData])=>{
+  _secs.forEach(([secName,secData])=>{
     const sc=SEC_COLORS[secName]||'#6e6e73';
     container.appendChild(buildSectionBlock(retailer,secName,secData,sc));
   });
 }
 
 function renderDetail(){
+  syncDetailFilterOptions();
   const container=document.getElementById('detailSections');
   container.innerHTML='';
   const isAll=activeRetailer==='All';
   const rets=isAll?Object.keys(EDIT):[activeRetailer];
   if(isAll){
     document.getElementById('detailRetailerName').textContent='All Retailers';
-    document.getElementById('detailTotalBadge').textContent=Object.values(EDIT).reduce((s,rd)=>s+Object.values(rd.sections||{}).reduce((ss,sec)=>ss+sec.products.reduce((ps,p)=>ps+rangeSum(p.weekly),0),0),0).toLocaleString();
+    document.getElementById('detailTotalBadge').textContent=allRangeTotal().toLocaleString();
   } else {
     document.getElementById('detailRetailerName').textContent=activeRetailer;
     const _rd=EDIT[activeRetailer];
-    document.getElementById('detailTotalBadge').textContent=Object.values(_rd?.sections||{}).reduce((s,sec)=>s+sec.products.reduce((ps,p)=>ps+rangeSum(p.weekly),0),0).toLocaleString();
+    document.getElementById('detailTotalBadge').textContent=retailerRangeTotal(_rd).toLocaleString();
   }
   rets.forEach(r=>renderRetailerBlock(container,r));
+  if((activeBrand!=='ALL'||activeType!=='ALL') && !container.querySelector('.sec-block')){
+    const m=document.createElement('div'); m.style.cssText='padding:40px;text-align:center;color:var(--text-3);font-size:13px';
+    m.textContent='No products match the selected Brand and Type.'; container.appendChild(m);
+  }
   const bb=document.createElement('div'); bb.className='bottom-bar';
   if(!isAll){
     bb.innerHTML=`<button class="ic-btn btn-add" style="padding:8px 16px;font-size:12px" onclick="addSection('${activeRetailer}')">+ Add Section</button>`;
