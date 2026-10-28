@@ -1119,6 +1119,9 @@ const selFrom=document.getElementById('wkFrom'),selTo=document.getElementById('w
 let _lastWeekCount;
 
 // Hide Detail Table week columns that fall outside the chosen From/To range (view only, no data changes)
+// Sum of a weekly array over the selected From/To range (Detail Table totals follow the chosen weeks)
+function rangeSum(arr){ return arr.slice(Math.max(wkFrom,0), wkTo+1).reduce((a,b)=>a+b,0); }
+
 function applyDetailWeekFilter(){
   let st = document.getElementById('wkFilterStyle');
   if(!st){ st = document.createElement('style'); st.id = 'wkFilterStyle'; document.head.appendChild(st); }
@@ -1155,8 +1158,8 @@ function refreshWeekSelects(){
 }
 
 refreshWeekSelects();
-selFrom.addEventListener('change',()=>{wkFrom=+selFrom.value;document.querySelectorAll('.qtr-btn').forEach(b=>b.classList.remove('active'));applyDetailWeekFilter();if(currentView==='overview')renderAll();});
-selTo.addEventListener('change',()=>{wkTo=+selTo.value;document.querySelectorAll('.qtr-btn').forEach(b=>b.classList.remove('active'));applyDetailWeekFilter();if(currentView==='overview')renderAll();});
+selFrom.addEventListener('change',()=>{wkFrom=+selFrom.value;document.querySelectorAll('.qtr-btn').forEach(b=>b.classList.remove('active'));applyDetailWeekFilter();renderAll();});
+selTo.addEventListener('change',()=>{wkTo=+selTo.value;document.querySelectorAll('.qtr-btn').forEach(b=>b.classList.remove('active'));applyDetailWeekFilter();renderAll();});
 
 /* ── retailer tabs ── */
 const tabsEl=document.getElementById('retailerTabs');
@@ -1280,7 +1283,7 @@ function setQuarter(q){
   if(selFrom) selFrom.value = wkFrom;
   if(selTo) selTo.value = wkTo;
   applyDetailWeekFilter();
-  if(currentView==='overview') renderAll();
+  renderAll();
 }
 
 
@@ -1568,7 +1571,7 @@ function updateTotalCells(retailer, secName){
       const p=sec.products[+tr.dataset.pidx];
       if(!p) return;
       const ttd=tr.querySelector('.col-total');
-      if(ttd) ttd.textContent=p.total!==0?p.total:'—';
+      if(ttd){ const _rt=rangeSum(p.weekly); ttd.textContent=_rt!==0?_rt:'—'; }
     });
     // update weekly total row
     const wkTotalRow=tbody.querySelector('.wk-total-row');
@@ -1577,13 +1580,13 @@ function updateTotalCells(retailer, secName){
       const wt=new Array(cols.length).fill(0);
       sec.products.forEach(p=>{ const wk=p.weekly.slice(0,cols.length); wk.forEach((v,i)=>wt[i]+=(v||0)); });
       const tds=wkTotalRow.querySelectorAll('td');
-      if(tds[1]) tds[1].textContent=wt.reduce((a,b)=>a+b,0)||'—';
+      if(tds[1]) tds[1].textContent=wt.slice(wkFrom,wkTo+1).reduce((a,b)=>a+b,0)||'—';
       wt.forEach((v,i)=>{ if(tds[i+2]) tds[i+2].textContent=v||'—'; });
     }
   }
   // update section total badge
   const totalEl=document.getElementById(`st_${sid}`);
-  if(totalEl){ const t=sec.products.reduce((s,p)=>s+p.weekly.reduce((a,b)=>a+b,0),0); totalEl.textContent=t>0?t.toLocaleString():'—'; }
+  if(totalEl){ const t=sec.products.reduce((s,p)=>s+rangeSum(p.weekly),0); totalEl.textContent=t>0?t.toLocaleString():'—'; }
   refreshDetailHeader();
 }
 
@@ -1676,7 +1679,7 @@ function addWeekColumn(retailer, secName){
     const retailer = nameEl.textContent.trim();
     const rd = EDIT[retailer];
     if(!rd) return;
-    const total = Object.values(rd.sections||{}).reduce((s,sec)=>s+sec.products.reduce((ps,p)=>ps+p.weekly.reduce((a,b)=>a+b,0),0),0);
+    const total = Object.values(rd.sections||{}).reduce((s,sec)=>s+sec.products.reduce((ps,p)=>ps+rangeSum(p.weekly),0),0);
     badge.textContent = total.toLocaleString();
   });
 
@@ -1853,7 +1856,7 @@ const SEC_SORT = {};
 function totalHeaderHtml(retailer, secName){
   const mode = SEC_SORT[retailer+'__'+secName] || null;
   const arrow = mode==='desc' ? '▼' : mode==='asc' ? '▲' : '⇅';
-  const tip = mode==='desc' ? 'Highest first. Click for lowest first' : mode==='asc' ? 'Lowest first. Click for original order' : 'Sort by total';
+  const tip = mode==='desc' ? 'Highest first. Click for lowest first' : mode==='asc' ? 'Lowest first. Click for original order' : 'Sort by total for the weeks shown';
   const aria = mode==='desc' ? 'descending' : mode==='asc' ? 'ascending' : 'none';
   return `<th class="col-total" aria-sort="${aria}"><button type="button" class="sort-btn${mode?' active':''}" onclick="toggleSecSort('${retailer}','${secName}')" title="${tip}" aria-label="Sort by total">Total <span class="sort-arrow" aria-hidden="true">${arrow}</span></button></th>`;
 }
@@ -1870,16 +1873,16 @@ function renderTbody(tbody, retailer, secName, secData, secColor){
   const prods=secData.products;
   const cols=getSecCols(retailer, secName);
   const nCols=cols.length;
-  const maxProd=Math.max(...prods.map(p=>p.weekly.reduce((a,b)=>a+b,0)),1);
+  const maxProd=Math.max(...prods.map(p=>rangeSum(p.weekly)),1);
   const sortMode=SEC_SORT[retailer+'__'+secName]||null;
-  const rowTotals=prods.map(p=>p.weekly.reduce((a,b)=>a+b,0));
+  const rowTotals=prods.map(p=>rangeSum(p.weekly));
   const order=prods.map((_,i)=>i);
   if(sortMode) order.sort((a,b)=>(sortMode==='desc'?rowTotals[b]-rowTotals[a]:rowTotals[a]-rowTotals[b])||(a-b));
   order.forEach((pIdx,dIdx)=>{
     const p=prods[pIdx];
     const weekly=p.weekly.slice(0, nCols);
     while(weekly.length<nCols) weekly.push(0);
-    const _pTotal=p.weekly.reduce((a,b)=>a+b,0);
+    const _pTotal=rangeSum(p.weekly);
     const pos=weekly.filter(v=>v>0);
     const mean=pos.length?pos.reduce((a,b)=>a+b,0)/pos.length:0;
     const sd=pos.length>1?Math.sqrt(pos.reduce((s,v)=>s+(v-mean)**2,0)/pos.length):0;
@@ -1911,7 +1914,7 @@ function renderTbody(tbody, retailer, secName, secData, secColor){
     typetd.appendChild(te); tr.appendChild(typetd);
     // total td
     const ttd=document.createElement('td'); ttd.className='col-total';
-    const _pt=p.weekly.reduce((a,b)=>a+b,0);
+    const _pt=rangeSum(p.weekly);
     ttd.textContent=_pt!==0?_pt:'—'; tr.appendChild(ttd);
     // weekly tds
     weekly.forEach((v,wIdx)=>{
@@ -1959,7 +1962,7 @@ function renderTbody(tbody, retailer, secName, secData, secColor){
   const wt=new Array(nCols).fill(0);
   prods.forEach(p=>{ const wk=p.weekly.slice(0,nCols); wk.forEach((v,i)=>wt[i]+=(v||0)); });
   const ttr=document.createElement('tr'); ttr.className='wk-total-row';
-  ttr.innerHTML=`<td class="col-num"></td><td class="col-name">Weekly Total</td><td class="col-type"></td><td class="col-total">${wt.reduce((a,b)=>a+b,0)||'—'}</td>`;
+  ttr.innerHTML=`<td class="col-num"></td><td class="col-name">Weekly Total</td><td class="col-type"></td><td class="col-total">${wt.slice(wkFrom,wkTo+1).reduce((a,b)=>a+b,0)||'—'}</td>`;
   wt.forEach((v,i)=>{ const td=document.createElement('td'); td.dataset.w=i; td.textContent=v||'—'; ttr.appendChild(td); });
   const etd=document.createElement('td'); ttr.appendChild(etd);
   tbody.appendChild(ttr);
@@ -1971,7 +1974,7 @@ function buildSectionBlock(retailer, secName, secData, secColor){
   const sid=`sb_${retailer}_${secName}`.replace(/[^a-z0-9]/gi,'_');
   // header
   const hd=document.createElement('div'); hd.className='sec-hd';
-  hd.innerHTML=`<span class="sec-hd-name" style="color:${secColor}" contenteditable="true" spellcheck="false" onblur="renameSectionFromEl(this,'${retailer}','${secName}')">${secName}</span><div class="sec-hd-right"><span class="sec-total" style="color:${secColor}" id="st_${sid}">${(()=>{const t=secData.products.reduce((s,p)=>s+p.weekly.reduce((a,b)=>a+b,0),0);return t>0?t.toLocaleString():'—';})()}</span><button class="ic-btn btn-del" onclick="removeSection('${retailer}','${secName}')" title="Remove section">✕</button></div>`;
+  hd.innerHTML=`<span class="sec-hd-name" style="color:${secColor}" contenteditable="true" spellcheck="false" onblur="renameSectionFromEl(this,'${retailer}','${secName}')">${secName}</span><div class="sec-hd-right"><span class="sec-total" style="color:${secColor}" id="st_${sid}">${(()=>{const t=secData.products.reduce((s,p)=>s+rangeSum(p.weekly),0);return t>0?t.toLocaleString():'—';})()}</span><button class="ic-btn btn-del" onclick="removeSection('${retailer}','${secName}')" title="Remove section">✕</button></div>`;
   block.appendChild(hd);
   // scroll+table
   const scroll=document.createElement('div'); scroll.className='tbl-scroll';
@@ -2040,17 +2043,17 @@ function refreshSection(retailer, secName){
   const tbody=document.getElementById(`tb_${sid}`);
   if(tbody)renderTbody(tbody,retailer,secName,sd,sc);
   const st=document.getElementById(`st_${sid}`);
-  if(st)st.textContent=sd.total>0?sd.total.toLocaleString():'—';
+  if(st){ const _t=sd.products.reduce((s,p)=>s+rangeSum(p.weekly),0); st.textContent=_t>0?_t.toLocaleString():'—'; }
   refreshDetailHeader();
 }
 
 function refreshDetailHeader(){
   if(activeRetailer==='All'){
-    const grand=Object.values(EDIT).reduce((s,rd)=>s+Object.values(rd.sections||{}).reduce((ss,sec)=>ss+sec.products.reduce((ps,p)=>ps+p.weekly.reduce((a,b)=>a+b,0),0),0),0);
+    const grand=Object.values(EDIT).reduce((s,rd)=>s+Object.values(rd.sections||{}).reduce((ss,sec)=>ss+sec.products.reduce((ps,p)=>ps+rangeSum(p.weekly),0),0),0);
     document.getElementById('detailTotalBadge').textContent=grand.toLocaleString();
   } else {
     const _rd=EDIT[activeRetailer];
-    document.getElementById('detailTotalBadge').textContent=Object.values(_rd?.sections||{}).reduce((s,sec)=>s+sec.products.reduce((ps,p)=>ps+p.weekly.reduce((a,b)=>a+b,0),0),0).toLocaleString();
+    document.getElementById('detailTotalBadge').textContent=Object.values(_rd?.sections||{}).reduce((s,sec)=>s+sec.products.reduce((ps,p)=>ps+rangeSum(p.weekly),0),0).toLocaleString();
   }
 }
 
@@ -2102,7 +2105,7 @@ function renderRetailerBlock(container, retailer){
   const color=colorForRetailer(retailer);
   if(activeRetailer==='All'){
     const h=document.createElement('div'); h.className='ret-heading';
-    h.innerHTML=`<span class="ret-heading-name" style="color:${color}">${retailer}</span><div class="ret-heading-right"><span class="ret-total-badge" style="background:${color}">${Object.values(rd.sections||{}).reduce((s,sec)=>s+sec.products.reduce((ps,p)=>ps+p.weekly.reduce((a,b)=>a+b,0),0),0).toLocaleString()}</span><button class="ic-btn btn-add" onclick="addSection('${retailer}')">+ Section</button></div>`;
+    h.innerHTML=`<span class="ret-heading-name" style="color:${color}">${retailer}</span><div class="ret-heading-right"><span class="ret-total-badge" style="background:${color}">${Object.values(rd.sections||{}).reduce((s,sec)=>s+sec.products.reduce((ps,p)=>ps+rangeSum(p.weekly),0),0).toLocaleString()}</span><button class="ic-btn btn-add" onclick="addSection('${retailer}')">+ Section</button></div>`;
     container.appendChild(h);
   }
   Object.entries(rd.sections).forEach(([secName,secData])=>{
@@ -2118,11 +2121,11 @@ function renderDetail(){
   const rets=isAll?Object.keys(EDIT):[activeRetailer];
   if(isAll){
     document.getElementById('detailRetailerName').textContent='All Retailers';
-    document.getElementById('detailTotalBadge').textContent=Object.values(EDIT).reduce((s,rd)=>s+Object.values(rd.sections||{}).reduce((ss,sec)=>ss+sec.products.reduce((ps,p)=>ps+p.weekly.reduce((a,b)=>a+b,0),0),0),0).toLocaleString();
+    document.getElementById('detailTotalBadge').textContent=Object.values(EDIT).reduce((s,rd)=>s+Object.values(rd.sections||{}).reduce((ss,sec)=>ss+sec.products.reduce((ps,p)=>ps+rangeSum(p.weekly),0),0),0).toLocaleString();
   } else {
     document.getElementById('detailRetailerName').textContent=activeRetailer;
     const _rd=EDIT[activeRetailer];
-    document.getElementById('detailTotalBadge').textContent=Object.values(_rd?.sections||{}).reduce((s,sec)=>s+sec.products.reduce((ps,p)=>ps+p.weekly.reduce((a,b)=>a+b,0),0),0).toLocaleString();
+    document.getElementById('detailTotalBadge').textContent=Object.values(_rd?.sections||{}).reduce((s,sec)=>s+sec.products.reduce((ps,p)=>ps+rangeSum(p.weekly),0),0).toLocaleString();
   }
   rets.forEach(r=>renderRetailerBlock(container,r));
   const bb=document.createElement('div'); bb.className='bottom-bar';
