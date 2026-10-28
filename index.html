@@ -565,8 +565,8 @@ body {
         <span class="wk-label">To</span>
         <select class="wk-sel" id="wkTo" style="min-width:110px"></select>
       </div>
-      <div class="toolbar-sep"></div>
-      <div class="tb-group">
+      <div class="toolbar-sep" id="brandTypeSep"></div>
+      <div class="tb-group" id="brandTypeGroup">
         <span class="wk-label">Brand</span>
         <select class="wk-sel" id="brandFilterSel" style="min-width:120px" onchange="setActiveBrand(this.value)">
           <option value="ALL">All Brands</option>
@@ -1116,6 +1116,19 @@ function renderSlowMovers(){
 
 const selFrom=document.getElementById('wkFrom'),selTo=document.getElementById('wkTo');
 
+let _lastWeekCount;
+
+// Hide Detail Table week columns that fall outside the chosen From/To range (view only, no data changes)
+function applyDetailWeekFilter(){
+  let st = document.getElementById('wkFilterStyle');
+  if(!st){ st = document.createElement('style'); st.id = 'wkFilterStyle'; document.head.appendChild(st); }
+  const hidden = [];
+  for(let i = 0; i < WEEKS.length; i++){
+    if(i < wkFrom || i > wkTo) hidden.push('.so-table [data-w="' + i + '"]');
+  }
+  st.textContent = hidden.length ? hidden.join(',') + '{display:none}' : '';
+}
+
 function refreshWeekSelects(){
   selFrom.innerHTML = '';
   selTo.innerHTML   = '';
@@ -1125,15 +1138,25 @@ function refreshWeekSelects(){
     selFrom.add(new Option(label,i));
     selTo.add(new Option(label,i));
   });
-  wkFrom = 0;
-  wkTo   = WEEKS.length - 1;
+  // keep the chosen range when weeks are added, removed or renamed;
+  // if the range ended on the last week, keep following the last week
+  const len = WEEKS.length;
+  if(typeof _lastWeekCount === 'undefined'){
+    wkFrom = 0; wkTo = len - 1;
+  } else {
+    const followEnd = (wkTo === _lastWeekCount - 1);
+    wkFrom = Math.max(0, Math.min(wkFrom, len - 1));
+    wkTo   = followEnd ? len - 1 : Math.min(wkTo, len - 1);
+  }
+  _lastWeekCount = len;
   selFrom.value = wkFrom;
   selTo.value   = wkTo;
+  applyDetailWeekFilter();
 }
 
 refreshWeekSelects();
-selFrom.addEventListener('change',()=>{wkFrom=+selFrom.value;document.querySelectorAll('.qtr-btn').forEach(b=>b.classList.remove('active'));renderAll();});
-selTo.addEventListener('change',()=>{wkTo=+selTo.value;document.querySelectorAll('.qtr-btn').forEach(b=>b.classList.remove('active'));renderAll();});
+selFrom.addEventListener('change',()=>{wkFrom=+selFrom.value;document.querySelectorAll('.qtr-btn').forEach(b=>b.classList.remove('active'));applyDetailWeekFilter();if(currentView==='overview')renderAll();});
+selTo.addEventListener('change',()=>{wkTo=+selTo.value;document.querySelectorAll('.qtr-btn').forEach(b=>b.classList.remove('active'));applyDetailWeekFilter();if(currentView==='overview')renderAll();});
 
 /* ── retailer tabs ── */
 const tabsEl=document.getElementById('retailerTabs');
@@ -1155,7 +1178,11 @@ function switchView(v,btn){
   document.querySelectorAll('.nav-tab').forEach(t=>{t.classList.remove('active');t.removeAttribute('aria-current');});btn.classList.add('active');btn.setAttribute('aria-current','page');
   document.getElementById('overviewView').style.display=v==='overview'?'block':'none';
   document.getElementById('detailView').style.display=v==='detail'?'block':'none';
-  document.getElementById('wkRangeCtrl').style.display=v==='overview'?'flex':'none';
+  // Quarter and week range apply to both views; Brand and Type only apply to the overview charts
+  document.getElementById('wkRangeCtrl').style.display='flex';
+  document.getElementById('brandTypeGroup').style.display=v==='overview'?'flex':'none';
+  document.getElementById('brandTypeSep').style.display=v==='overview'?'':'none';
+  applyDetailWeekFilter();
   renderAll();
 }
 
@@ -1252,7 +1279,8 @@ function setQuarter(q){
   const selTo = document.getElementById('wkTo');
   if(selFrom) selFrom.value = wkFrom;
   if(selTo) selTo.value = wkTo;
-  renderAll();
+  applyDetailWeekFilter();
+  if(currentView==='overview') renderAll();
 }
 
 
@@ -1724,7 +1752,7 @@ function rebuildSectionTable(retailer, secName){
     const cols = getSecCols(retailer, secName);
     let th = `<th class="col-num">#</th><th class="col-name">Product</th><th class="col-type">Type</th>${totalHeaderHtml(retailer, secName)}`;
     cols.forEach((h,ci)=>{
-      th += `<th style="min-width:80px;width:80px;">
+      th += `<th data-w="${ci}" style="min-width:80px;width:80px;">
         <div style="display:flex;align-items:center;justify-content:center;gap:3px">
           <span contenteditable="true" spellcheck="false"
             style="outline:none;border-bottom:1px dashed transparent;transition:border-color .15s;font-weight:700"
@@ -1888,6 +1916,7 @@ function renderTbody(tbody, retailer, secName, secData, secColor){
     // weekly tds
     weekly.forEach((v,wIdx)=>{
       const td=document.createElement('td');
+      td.dataset.w=wIdx;
       td.className=cellClass(v,mean,sd);
       td.contentEditable='true'; td.spellcheck=false;
       td.textContent=v===0?'—':v;
@@ -1931,7 +1960,7 @@ function renderTbody(tbody, retailer, secName, secData, secColor){
   prods.forEach(p=>{ const wk=p.weekly.slice(0,nCols); wk.forEach((v,i)=>wt[i]+=(v||0)); });
   const ttr=document.createElement('tr'); ttr.className='wk-total-row';
   ttr.innerHTML=`<td class="col-num"></td><td class="col-name">Weekly Total</td><td class="col-type"></td><td class="col-total">${wt.reduce((a,b)=>a+b,0)||'—'}</td>`;
-  wt.forEach(v=>{ const td=document.createElement('td'); td.textContent=v||'—'; ttr.appendChild(td); });
+  wt.forEach((v,i)=>{ const td=document.createElement('td'); td.dataset.w=i; td.textContent=v||'—'; ttr.appendChild(td); });
   const etd=document.createElement('td'); ttr.appendChild(etd);
   tbody.appendChild(ttr);
 }
@@ -1950,7 +1979,7 @@ function buildSectionBlock(retailer, secName, secData, secColor){
   const cols0=getSecCols(retailer, secName);
   let th=`<th class="col-num">#</th><th class="col-name">Product</th><th class="col-type">Type</th>${totalHeaderHtml(retailer, secName)}`;
   cols0.forEach((h,ci)=>{
-    th+=`<th style="min-width:80px;width:80px;">
+    th+=`<th data-w="${ci}" style="min-width:80px;width:80px;">
       <div style="display:flex;align-items:center;justify-content:center;gap:3px">
         <span contenteditable="true" spellcheck="false"
           style="outline:none;border-bottom:1px dashed transparent;transition:border-color .15s;font-weight:700"
