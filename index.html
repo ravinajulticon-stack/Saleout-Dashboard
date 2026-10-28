@@ -426,6 +426,10 @@ body {
 }
 .so-table tbody td.col-total { font-weight: 700; color: var(--blue-light); background: rgba(10,132,255,0.06); position: sticky; left: 200px; z-index: 1; }
 .so-table thead th.col-total { position: sticky; left: 200px; z-index: 3; background: rgba(28,28,30,0.95); }
+.sort-btn { background: none; border: none; color: inherit; font: inherit; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; border-radius: 4px; }
+.sort-btn:hover { background: rgba(255,255,255,0.08); }
+.sort-arrow { font-size: 9px; opacity: 0.55; }
+.sort-btn.active .sort-arrow { opacity: 1; }
 .so-table tbody tr:hover td { background: rgba(255,255,255,0.04) !important; }
 .so-table tbody tr:hover td.col-name { background: rgba(255,255,255,0.06) !important; }
 
@@ -1532,8 +1536,8 @@ function updateTotalCells(retailer, secName){
   const tbody=document.getElementById(`tb_${sid}`);
   if(tbody){
     const rows=tbody.querySelectorAll('tr:not(.wk-total-row)');
-    rows.forEach((tr,pIdx)=>{
-      const p=sec.products[pIdx];
+    rows.forEach(tr=>{
+      const p=sec.products[+tr.dataset.pidx];
       if(!p) return;
       const ttd=tr.querySelector('.col-total');
       if(ttd) ttd.textContent=p.total!==0?p.total:'—';
@@ -1718,7 +1722,7 @@ function rebuildSectionTable(retailer, secName){
   const thead = document.querySelector(`#tb_${sid}`)?.closest('table')?.querySelector('thead tr');
   if(thead){
     const cols = getSecCols(retailer, secName);
-    let th = `<th class="col-num">#</th><th class="col-name">Product</th><th class="col-type">Type</th><th class="col-total">Total</th>`;
+    let th = `<th class="col-num">#</th><th class="col-name">Product</th><th class="col-type">Type</th>${totalHeaderHtml(retailer, secName)}`;
     cols.forEach((h,ci)=>{
       th += `<th style="min-width:80px;width:80px;">
         <div style="display:flex;align-items:center;justify-content:center;gap:3px">
@@ -1816,13 +1820,35 @@ function updateColDay(retailer, secName, colIdx){
   });
 }
 
+// View-only sort by product total, per section. Does not change the saved product order.
+const SEC_SORT = {};
+function totalHeaderHtml(retailer, secName){
+  const mode = SEC_SORT[retailer+'__'+secName] || null;
+  const arrow = mode==='desc' ? '▼' : mode==='asc' ? '▲' : '⇅';
+  const tip = mode==='desc' ? 'Highest first. Click for lowest first' : mode==='asc' ? 'Lowest first. Click for original order' : 'Sort by total';
+  const aria = mode==='desc' ? 'descending' : mode==='asc' ? 'ascending' : 'none';
+  return `<th class="col-total" aria-sort="${aria}"><button type="button" class="sort-btn${mode?' active':''}" onclick="toggleSecSort('${retailer}','${secName}')" title="${tip}" aria-label="Sort by total">Total <span class="sort-arrow" aria-hidden="true">${arrow}</span></button></th>`;
+}
+function toggleSecSort(retailer, secName){
+  const k = retailer+'__'+secName;
+  const cur = SEC_SORT[k] || null;
+  const next = cur===null ? 'desc' : cur==='desc' ? 'asc' : null;
+  if(next) SEC_SORT[k] = next; else delete SEC_SORT[k];
+  rebuildSectionTable(retailer, secName);
+}
+
 function renderTbody(tbody, retailer, secName, secData, secColor){
   tbody.innerHTML='';
   const prods=secData.products;
   const cols=getSecCols(retailer, secName);
   const nCols=cols.length;
   const maxProd=Math.max(...prods.map(p=>p.weekly.reduce((a,b)=>a+b,0)),1);
-  prods.forEach((p,pIdx)=>{
+  const sortMode=SEC_SORT[retailer+'__'+secName]||null;
+  const rowTotals=prods.map(p=>p.weekly.reduce((a,b)=>a+b,0));
+  const order=prods.map((_,i)=>i);
+  if(sortMode) order.sort((a,b)=>(sortMode==='desc'?rowTotals[b]-rowTotals[a]:rowTotals[a]-rowTotals[b])||(a-b));
+  order.forEach((pIdx,dIdx)=>{
+    const p=prods[pIdx];
     const weekly=p.weekly.slice(0, nCols);
     while(weekly.length<nCols) weekly.push(0);
     const _pTotal=p.weekly.reduce((a,b)=>a+b,0);
@@ -1831,9 +1857,10 @@ function renderTbody(tbody, retailer, secName, secData, secColor){
     const sd=pos.length>1?Math.sqrt(pos.reduce((s,v)=>s+(v-mean)**2,0)/pos.length):0;
     const barPct=Math.round(Math.max(_pTotal,0)/maxProd*100);
     const tr=document.createElement('tr');
+    tr.dataset.pidx=pIdx;
     // number td
     const numtd=document.createElement('td'); numtd.className='col-num';
-    numtd.textContent=pIdx+1; tr.appendChild(numtd);
+    numtd.textContent=dIdx+1; tr.appendChild(numtd);
     // name td
     const ntd=document.createElement('td'); ntd.className='col-name';
     ntd.innerHTML=`<div><span class="name-editable" contenteditable="true" spellcheck="false">${p.name}</span><span class="nano-bar"><span class="nano-fill" style="width:${barPct}%;background:${secColor}"></span></span></div>`;
@@ -1921,7 +1948,7 @@ function buildSectionBlock(retailer, secName, secData, secColor){
   const scroll=document.createElement('div'); scroll.className='tbl-scroll';
   const tbl=document.createElement('table'); tbl.className='so-table';
   const cols0=getSecCols(retailer, secName);
-  let th=`<th class="col-num">#</th><th class="col-name">Product</th><th class="col-type">Type</th><th class="col-total">Total</th>`;
+  let th=`<th class="col-num">#</th><th class="col-name">Product</th><th class="col-type">Type</th>${totalHeaderHtml(retailer, secName)}`;
   cols0.forEach((h,ci)=>{
     th+=`<th style="min-width:80px;width:80px;">
       <div style="display:flex;align-items:center;justify-content:center;gap:3px">
