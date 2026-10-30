@@ -405,6 +405,7 @@ body {
 .st-sel option { background: var(--surface-2); color: var(--text); }
 .st-sel[data-state="online"] { color: var(--green); border-color: rgba(48,209,88,0.55); background: rgba(48,209,88,0.1); }
 .st-sel[data-state="offline"] { color: var(--amber); border-color: rgba(255,159,10,0.55); background: rgba(255,159,10,0.1); }
+.st-sel[data-state="eol"] { color: var(--red); border-color: rgba(255,69,58,0.55); background: rgba(255,69,58,0.1); }
 .toolbar { position: relative; z-index: 30; } /* keeps the product picker above the table headers */
 .ms-wrap { position: relative; display: inline-block; }
 .ms-btn { cursor: pointer; text-align: left; min-width: 130px; }
@@ -610,6 +611,7 @@ body {
           <option value="ALL">All Statuses</option>
           <option value="online">Online</option>
           <option value="offline">Offline</option>
+          <option value="eol">EOL (End of Line)</option>
           <option value="NONE">Not Set</option>
         </select>
         <span class="wk-label" id="productMultiLabel">Products</span>
@@ -2081,8 +2083,9 @@ function renderTbody(tbody, retailer, secName, secData, secColor){
     // status td (Online / Offline, chosen per product)
     const sttd=document.createElement('td'); sttd.className='col-status';
     const ssel=document.createElement('select'); ssel.className='st-sel';
-    ssel.setAttribute('aria-label','Online or offline status for '+p.name);
-    [['','Not set'],['online','Online'],['offline','Offline']].forEach(([v,l])=>{ const o=document.createElement('option'); o.value=v; o.textContent=l; ssel.appendChild(o); });
+    ssel.setAttribute('aria-label','Online, offline or end of line status for '+p.name);
+    ssel.title='EOL = End of Line';
+    [['','Not set'],['online','Online'],['offline','Offline'],['eol','EOL']].forEach(([v,l])=>{ const o=document.createElement('option'); o.value=v; o.textContent=l; ssel.appendChild(o); });
     ssel.value=p.online||''; ssel.dataset.state=p.online||'';
     ssel.addEventListener('change',()=>{
       EDIT[retailer].sections[secName].products[pIdx].online=ssel.value;
