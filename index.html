@@ -399,6 +399,25 @@ body {
 .so-table thead th.col-total { color: var(--blue-light); }
 .so-table thead th.col-type { min-width: 100px; width: 100px; color: var(--text-2); }
 .so-table td.col-type { min-width: 100px; width: 100px; color: var(--text-2); font-size: 11px; }
+.so-table thead th.col-status { min-width: 104px; width: 104px; color: var(--text-2); }
+.so-table td.col-status { min-width: 104px; width: 104px; padding: 3px 6px; }
+.st-sel { width: 100%; background: transparent; border: 1px solid var(--border-strong); border-radius: 6px; color: var(--text-3); font: inherit; font-size: 11px; padding: 3px 4px; cursor: pointer; }
+.st-sel option { background: var(--surface-2); color: var(--text); }
+.st-sel[data-state="online"] { color: var(--green); border-color: rgba(48,209,88,0.55); background: rgba(48,209,88,0.1); }
+.st-sel[data-state="offline"] { color: var(--amber); border-color: rgba(255,159,10,0.55); background: rgba(255,159,10,0.1); }
+.ms-wrap { position: relative; display: inline-block; }
+.ms-btn { cursor: pointer; text-align: left; min-width: 130px; }
+.ms-btn.on { border-color: var(--blue); color: var(--blue-light); }
+.ms-panel { position: absolute; top: calc(100% + 6px); left: 0; z-index: 60; width: 300px; background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: 10px; box-shadow: var(--shadow-lg); padding: 8px; }
+.ms-panel[hidden] { display: none; }
+.ms-search { width: 100%; background: var(--surface-1); border: 1px solid var(--border-strong); border-radius: 6px; color: var(--text); font: inherit; font-size: 12px; padding: 6px 8px; margin-bottom: 6px; }
+.ms-list { max-height: 260px; overflow-y: auto; }
+.ms-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; font-size: 12px; color: var(--text); cursor: pointer; }
+.ms-row:hover { background: rgba(255,255,255,0.06); }
+.ms-empty { padding: 10px; color: var(--text-3); font-size: 12px; }
+.ms-foot { display: flex; justify-content: space-between; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border); }
+.ms-foot button { background: none; border: none; color: var(--blue-light); font: inherit; font-size: 12px; cursor: pointer; padding: 4px 8px; border-radius: 6px; }
+.ms-foot button:hover { background: rgba(255,255,255,0.06); }
 .so-table thead th.col-num { min-width: 36px; width: 36px; color: var(--text-3); text-align: center; }
 .so-table td.col-num { min-width: 36px; width: 36px; color: var(--text-3); font-size: 11px; text-align: center; }
 .so-table thead th.col-del { min-width: 36px; border-right: none; }
@@ -575,6 +594,22 @@ body {
         <select class="wk-sel" id="typeFilterSel" style="min-width:110px" onchange="setActiveType(this.value)">
           <option value="ALL">All Types</option>
         </select>
+        <span class="wk-label" id="statusFilterLabel" style="display:none">Status</span>
+        <select class="wk-sel" id="statusFilterSel" style="min-width:110px;display:none" onchange="setDetailStatus(this.value)">
+          <option value="ALL">All Statuses</option>
+          <option value="online">Online</option>
+          <option value="offline">Offline</option>
+          <option value="NONE">Not Set</option>
+        </select>
+        <span class="wk-label" id="productMultiLabel" style="display:none">Products</span>
+        <div class="ms-wrap" id="productMulti" style="display:none">
+          <button type="button" class="wk-sel ms-btn" id="productMultiBtn" aria-haspopup="true" aria-expanded="false">All Products ▾</button>
+          <div class="ms-panel" id="productMultiPanel" hidden>
+            <input type="text" id="productMultiSearch" class="ms-search" placeholder="Search products…" autocomplete="off" aria-label="Search products">
+            <div class="ms-list" id="productMultiList"></div>
+            <div class="ms-foot"><button type="button" id="productMultiClear">Clear</button><button type="button" id="productMultiClose">Done</button></div>
+          </div>
+        </div>
         <span class="wk-label" id="productFilterLabel" style="display:none">Product</span>
         <select class="wk-sel" id="productFilterSel" style="min-width:130px;display:none" onchange="if(!_skipProductChange)setActiveProduct(this.value)">
           <option value="ALL">All Products</option>
@@ -726,7 +761,7 @@ async function saveToSupabase(){
             for(let i=0;i<raw.length;i++){ h = Math.imul(31,h)+raw.charCodeAt(i)|0; }
             p.id = 'p_' + Math.abs(h).toString(36) + '_' + raw.slice(0,12);
           }
-          allProducts.push({ id:p.id, section_id:secId, retailer_id:rId, name:p.name, type:p.type||'', total:p.total, sort_order:pIdx });
+          allProducts.push({ id:p.id, section_id:secId, retailer_id:rId, name:p.name, type:p.type||'', online_status:p.online||null, total:p.total, sort_order:pIdx });
           p.weekly.forEach((qty,wi)=>{
             allSales.push({ id:p.id+'__'+wi, product_id:p.id, week_label:WEEK_HEADERS[wi]?.wk||'WK'+(27+wi), qty });
           });
@@ -826,7 +861,7 @@ async function loadFromSupabase(){
       const sec = sections.find(s => s.id === p.section_id);
       if(!r || !sec) return;
       const weekly = WEEK_HEADERS.map(h => salesByProduct[p.id]?.[h.wk] || 0);
-      newEdit[r.name].sections[sec.name].products.push({ id:p.id, name:p.name, type:p.type||'', total:p.total, weekly });
+      newEdit[r.name].sections[sec.name].products.push({ id:p.id, name:p.name, type:p.type||'', online:p.online_status||'', total:p.total, weekly });
     });
 
     // Apply to EDIT
@@ -1123,11 +1158,72 @@ let _lastWeekCount;
 function rangeSum(arr){ return arr.slice(Math.max(wkFrom,0), wkTo+1).reduce((a,b)=>a+b,0); }
 
 // Brand and Type filters on the Detail Table (shared with the Overview). Brand is the section name without " SOLD".
-function typeMatches(p){
+// Detail Table only: Status (online/offline) and multi-product filters
+let detailStatus = 'ALL';            // 'ALL', 'online', 'offline', 'NONE' (not set)
+const detailProducts = new Set();    // product names; empty = all products
+function typeOk(p){
   if(activeType==='ALL') return true;
   const t = p.type || 'Unknown';
   return activeType==='Safes' ? SAFE_SERIES.includes(t) : t===activeType;
 }
+function typeMatches(p){
+  if(detailStatus!=='ALL'){
+    const s = p.online || '';
+    if(detailStatus==='NONE' ? s!=='' : s!==detailStatus) return false;
+  }
+  if(detailProducts.size && !detailProducts.has(p.name)) return false;
+  return typeOk(p);
+}
+function detailFiltersOn(){ return activeBrand!=='ALL' || activeType!=='ALL' || detailStatus!=='ALL' || detailProducts.size>0; }
+function setDetailStatus(v){ detailStatus = v; renderDetail(); }
+// names offered in the Products picker: whatever the Brand and Type filters leave, plus anything already ticked
+function detailProductNames(){
+  const retailers = activeRetailer==='All' ? Object.keys(EDIT) : [activeRetailer];
+  const names = new Set(detailProducts);
+  retailers.forEach(r=>Object.entries((EDIT[r]&&EDIT[r].sections)||{}).forEach(([sn,sec])=>{
+    if(!brandMatches(sn)) return;
+    sec.products.forEach(p=>{ if(typeOk(p)) names.add(p.name); });
+  }));
+  return [...names].sort((a,b)=>a.localeCompare(b));
+}
+function syncDetailExtraFilters(){
+  const ss = document.getElementById('statusFilterSel'); if(ss) ss.value = detailStatus;
+  const btn = document.getElementById('productMultiBtn');
+  if(btn){ const n = detailProducts.size; btn.textContent = (n ? (n===1 ? '1 Product' : n+' Products') : 'All Products') + ' ▾'; btn.classList.toggle('on', n>0); }
+}
+let _msNames = [];
+function renderProductMultiList(){
+  const list = document.getElementById('productMultiList'); if(!list) return;
+  const q = ((document.getElementById('productMultiSearch')||{}).value||'').trim().toLowerCase();
+  _msNames = detailProductNames().filter(n=>!q || n.toLowerCase().includes(q));
+  list.innerHTML = _msNames.length
+    ? _msNames.map((n,i)=>'<label class="ms-row"><input type="checkbox" data-i="'+i+'"'+(detailProducts.has(n)?' checked':'')+'><span></span></label>').join('')
+    : '<div class="ms-empty">No products found</div>';
+  list.querySelectorAll('.ms-row span').forEach((s,i)=>{ s.textContent = _msNames[i]; });
+}
+function setProductMultiOpen(open){
+  const panel = document.getElementById('productMultiPanel'), btn = document.getElementById('productMultiBtn');
+  if(!panel || !btn) return;
+  panel.hidden = !open; btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  if(open){ const s = document.getElementById('productMultiSearch'); if(s) s.value = ''; renderProductMultiList(); if(s) s.focus(); }
+}
+(function wireProductMulti(){
+  const btn = document.getElementById('productMultiBtn'), panel = document.getElementById('productMultiPanel');
+  if(!btn || !panel) return;
+  btn.addEventListener('click', e=>{ e.stopPropagation(); setProductMultiOpen(panel.hidden); });
+  panel.addEventListener('click', e=>e.stopPropagation());
+  document.addEventListener('click', ()=>{ if(!panel.hidden) setProductMultiOpen(false); });
+  document.addEventListener('keydown', e=>{ if(e.key==='Escape' && !panel.hidden){ setProductMultiOpen(false); btn.focus(); } });
+  document.getElementById('productMultiSearch').addEventListener('input', renderProductMultiList);
+  document.getElementById('productMultiList').addEventListener('change', e=>{
+    const cb = e.target.closest('input[type=checkbox]'); if(!cb) return;
+    const name = _msNames[+cb.dataset.i]; if(name===undefined) return;
+    if(cb.checked) detailProducts.add(name); else detailProducts.delete(name);
+    renderDetail();
+  });
+  document.getElementById('productMultiClear').addEventListener('click', ()=>{ detailProducts.clear(); renderDetail(); renderProductMultiList(); });
+  document.getElementById('productMultiClose').addEventListener('click', ()=>setProductMultiOpen(false));
+})();
 function brandMatches(secName){ return activeBrand==='ALL' || secName.replace(' SOLD','')===activeBrand; }
 function visProds(secName, prods){ return brandMatches(secName) ? prods.filter(typeMatches) : []; }
 function retailerRangeTotal(rd){
@@ -1203,7 +1299,7 @@ function renderRetailerTabs(){
     const b=document.createElement('button');
     b.className='pill'+(r===activeRetailer?' active':'');
     b.textContent=r;
-    b.onclick=()=>{activeRetailer=r;activeType='ALL';activeBrand='ALL';activeSeries='ALL';activeProduct='ALL';document.querySelectorAll('.pill').forEach(t=>t.classList.remove('active'));b.classList.add('active');renderAll();};
+    b.onclick=()=>{activeRetailer=r;activeType='ALL';activeBrand='ALL';activeSeries='ALL';activeProduct='ALL';detailStatus='ALL';detailProducts.clear();document.querySelectorAll('.pill').forEach(t=>t.classList.remove('active'));b.classList.add('active');renderAll();};
     tabsEl.appendChild(b);
   });
 }
@@ -1222,6 +1318,9 @@ function switchView(v,btn){
   if(v==='detail'){ // the Product dropdown only applies to the Overview chart
     ['productFilterLabel','productFilterSel'].forEach(id=>{ const e=document.getElementById(id); if(e) e.style.display='none'; });
   }
+  // Status and the multi-product picker belong to the Detail Table
+  ['statusFilterLabel','statusFilterSel','productMultiLabel','productMulti'].forEach(id=>{ const e=document.getElementById(id); if(e) e.style.display = v==='detail' ? '' : 'none'; });
+  if(v!=='detail') setProductMultiOpen(false);
   applyDetailWeekFilter();
   renderAll();
 }
@@ -1616,9 +1715,9 @@ function updateTotalCells(retailer, secName){
       const cols=getSecCols(retailer,secName);
       const wt=new Array(cols.length).fill(0);
       visProds(secName,sec.products).forEach(p=>{ const wk=p.weekly.slice(0,cols.length); wk.forEach((v,i)=>wt[i]+=(v||0)); });
-      const tds=wkTotalRow.querySelectorAll('td');
-      if(tds[1]) tds[1].textContent=wt.slice(wkFrom,wkTo+1).reduce((a,b)=>a+b,0)||'—';
-      wt.forEach((v,i)=>{ if(tds[i+2]) tds[i+2].textContent=v||'—'; });
+      const totTd=wkTotalRow.querySelector('.col-total');
+      if(totTd) totTd.textContent=wt.slice(wkFrom,wkTo+1).reduce((a,b)=>a+b,0)||'—';
+      wkTotalRow.querySelectorAll('td[data-w]').forEach(td=>{ const i=+td.dataset.w; td.textContent=wt[i]||'—'; });
     }
   }
   // update section total badge
@@ -1790,7 +1889,7 @@ function rebuildSectionTable(retailer, secName){
   const thead = document.querySelector(`#tb_${sid}`)?.closest('table')?.querySelector('thead tr');
   if(thead){
     const cols = getSecCols(retailer, secName);
-    let th = `<th class="col-num">#</th><th class="col-name">Product</th><th class="col-type">Type</th>${totalHeaderHtml(retailer, secName)}`;
+    let th = `<th class="col-num">#</th><th class="col-name">Product</th><th class="col-type">Type</th><th class="col-status">Status</th>${totalHeaderHtml(retailer, secName)}`;
     cols.forEach((h,ci)=>{
       th += `<th data-w="${ci}" style="min-width:80px;width:80px;">
         <div style="display:flex;align-items:center;justify-content:center;gap:3px">
@@ -1950,6 +2049,19 @@ function renderTbody(tbody, retailer, secName, secData, secColor){
     });
     te.addEventListener('keydown',(e)=>{ if(e.key==='Enter'){e.preventDefault();te.blur();} if(e.key==='Escape'){te.textContent=p.type||'';te.blur();} });
     typetd.appendChild(te); tr.appendChild(typetd);
+    // status td (Online / Offline, chosen per product)
+    const sttd=document.createElement('td'); sttd.className='col-status';
+    const ssel=document.createElement('select'); ssel.className='st-sel';
+    ssel.setAttribute('aria-label','Online or offline status for '+p.name);
+    [['','Not set'],['online','Online'],['offline','Offline']].forEach(([v,l])=>{ const o=document.createElement('option'); o.value=v; o.textContent=l; ssel.appendChild(o); });
+    ssel.value=p.online||''; ssel.dataset.state=p.online||'';
+    ssel.addEventListener('change',()=>{
+      EDIT[retailer].sections[secName].products[pIdx].online=ssel.value;
+      ssel.dataset.state=ssel.value;
+      debouncedSave();
+      if(detailStatus!=='ALL') refreshSection(retailer,secName);
+    });
+    sttd.appendChild(ssel); tr.appendChild(sttd);
     // total td
     const ttd=document.createElement('td'); ttd.className='col-total';
     const _pt=rangeSum(p.weekly);
@@ -2000,7 +2112,7 @@ function renderTbody(tbody, retailer, secName, secData, secColor){
   const wt=new Array(nCols).fill(0);
   visList.forEach(p=>{ const wk=p.weekly.slice(0,nCols); wk.forEach((v,i)=>wt[i]+=(v||0)); });
   const ttr=document.createElement('tr'); ttr.className='wk-total-row';
-  ttr.innerHTML=`<td class="col-num"></td><td class="col-name">Weekly Total</td><td class="col-type"></td><td class="col-total">${wt.slice(wkFrom,wkTo+1).reduce((a,b)=>a+b,0)||'—'}</td>`;
+  ttr.innerHTML=`<td class="col-num"></td><td class="col-name">Weekly Total</td><td class="col-type"></td><td class="col-status"></td><td class="col-total">${wt.slice(wkFrom,wkTo+1).reduce((a,b)=>a+b,0)||'—'}</td>`;
   wt.forEach((v,i)=>{ const td=document.createElement('td'); td.dataset.w=i; td.textContent=v||'—'; ttr.appendChild(td); });
   const etd=document.createElement('td'); ttr.appendChild(etd);
   tbody.appendChild(ttr);
@@ -2018,7 +2130,7 @@ function buildSectionBlock(retailer, secName, secData, secColor){
   const scroll=document.createElement('div'); scroll.className='tbl-scroll';
   const tbl=document.createElement('table'); tbl.className='so-table';
   const cols0=getSecCols(retailer, secName);
-  let th=`<th class="col-num">#</th><th class="col-name">Product</th><th class="col-type">Type</th>${totalHeaderHtml(retailer, secName)}`;
+  let th=`<th class="col-num">#</th><th class="col-name">Product</th><th class="col-type">Type</th><th class="col-status">Status</th>${totalHeaderHtml(retailer, secName)}`;
   cols0.forEach((h,ci)=>{
     th+=`<th data-w="${ci}" style="min-width:80px;width:80px;">
       <div style="display:flex;align-items:center;justify-content:center;gap:3px">
@@ -2098,7 +2210,7 @@ function refreshDetailHeader(){
 function addProduct(retailer, secName){
   const p={name:'New Product',total:0,weekly:new Array(WEEK_HEADERS.length).fill(0),id:uid('p_')};
   EDIT[retailer].sections[secName].products.push(p);
-  if(activeType!=='ALL'){ activeType='ALL'; renderDetail(); } else refreshSection(retailer,secName);
+  if(activeType!=='ALL'||detailStatus!=='ALL'||detailProducts.size>0){ activeType='ALL'; detailStatus='ALL'; detailProducts.clear(); renderDetail(); } else refreshSection(retailer,secName);
   debouncedSave();
 }
 function removeSection(retailer, secName){
@@ -2141,7 +2253,7 @@ function addRetailerBlock(){
 function renderRetailerBlock(container, retailer){
   const rd=EDIT[retailer];
   const color=colorForRetailer(retailer);
-  const _filtered=activeBrand!=='ALL'||activeType!=='ALL';
+  const _filtered=detailFiltersOn();
   const _secs=Object.entries(rd.sections).filter(([sn,sd])=>!_filtered||visProds(sn,sd.products).length>0);
   if(_filtered && _secs.length===0 && activeRetailer==='All') return;
   if(activeRetailer==='All'){
@@ -2157,6 +2269,7 @@ function renderRetailerBlock(container, retailer){
 
 function renderDetail(){
   syncDetailFilterOptions();
+  syncDetailExtraFilters();
   const container=document.getElementById('detailSections');
   container.innerHTML='';
   const isAll=activeRetailer==='All';
@@ -2170,9 +2283,9 @@ function renderDetail(){
     document.getElementById('detailTotalBadge').textContent=retailerRangeTotal(_rd).toLocaleString();
   }
   rets.forEach(r=>renderRetailerBlock(container,r));
-  if((activeBrand!=='ALL'||activeType!=='ALL') && !container.querySelector('.sec-block')){
+  if(detailFiltersOn() && !container.querySelector('.sec-block')){
     const m=document.createElement('div'); m.style.cssText='padding:40px;text-align:center;color:var(--text-3);font-size:13px';
-    m.textContent='No products match the selected Brand and Type.'; container.appendChild(m);
+    m.textContent='No products match the selected filters.'; container.appendChild(m);
   }
   const bb=document.createElement('div'); bb.className='bottom-bar';
   if(!isAll){
