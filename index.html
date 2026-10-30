@@ -405,6 +405,7 @@ body {
 .st-sel option { background: var(--surface-2); color: var(--text); }
 .st-sel[data-state="online"] { color: var(--green); border-color: rgba(48,209,88,0.55); background: rgba(48,209,88,0.1); }
 .st-sel[data-state="offline"] { color: var(--amber); border-color: rgba(255,159,10,0.55); background: rgba(255,159,10,0.1); }
+.toolbar { position: relative; z-index: 30; } /* keeps the product picker above the table headers */
 .ms-wrap { position: relative; display: inline-block; }
 .ms-btn { cursor: pointer; text-align: left; min-width: 130px; }
 .ms-btn.on { border-color: var(--blue); color: var(--blue-light); }
