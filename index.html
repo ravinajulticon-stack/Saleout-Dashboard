@@ -602,8 +602,8 @@ body {
           <option value="offline">Offline</option>
           <option value="NONE">Not Set</option>
         </select>
-        <span class="wk-label" id="productMultiLabel" style="display:none">Products</span>
-        <div class="ms-wrap" id="productMulti" style="display:none">
+        <span class="wk-label" id="productMultiLabel">Products</span>
+        <div class="ms-wrap" id="productMulti">
           <button type="button" class="wk-sel ms-btn" id="productMultiBtn" aria-haspopup="true" aria-expanded="false">All Products ▾</button>
           <div class="ms-panel" id="productMultiPanel" hidden>
             <input type="text" id="productMultiSearch" class="ms-search" placeholder="Search products…" autocomplete="off" aria-label="Search products">
@@ -1177,6 +1177,11 @@ function typeMatches(p){
 }
 function detailFiltersOn(){ return activeBrand!=='ALL' || activeType!=='ALL' || detailStatus!=='ALL' || detailProducts.size>0; }
 function setDetailStatus(v){ detailStatus = v; renderDetail(); }
+// The Products picker works on both tabs: Detail Table rows or the Overview "Sales by Product" chart
+function refreshProductView(){
+  if(currentView==='detail') renderDetail();
+  else { syncDetailExtraFilters(); renderTypeChart(); }
+}
 // names offered in the Products picker: whatever the Brand and Type filters leave, plus anything already ticked
 function detailProductNames(){
   const retailers = activeRetailer==='All' ? Object.keys(EDIT) : [activeRetailer];
@@ -1220,9 +1225,9 @@ function setProductMultiOpen(open){
     const cb = e.target.closest('input[type=checkbox]'); if(!cb) return;
     const name = _msNames[+cb.dataset.i]; if(name===undefined) return;
     if(cb.checked) detailProducts.add(name); else detailProducts.delete(name);
-    renderDetail();
+    refreshProductView();
   });
-  document.getElementById('productMultiClear').addEventListener('click', ()=>{ detailProducts.clear(); renderDetail(); renderProductMultiList(); });
+  document.getElementById('productMultiClear').addEventListener('click', ()=>{ detailProducts.clear(); refreshProductView(); renderProductMultiList(); });
   document.getElementById('productMultiClose').addEventListener('click', ()=>setProductMultiOpen(false));
 })();
 function brandMatches(secName){ return activeBrand==='ALL' || secName.replace(' SOLD','')===activeBrand; }
@@ -1319,9 +1324,9 @@ function switchView(v,btn){
   if(v==='detail'){ // the Product dropdown only applies to the Overview chart
     ['productFilterLabel','productFilterSel'].forEach(id=>{ const e=document.getElementById(id); if(e) e.style.display='none'; });
   }
-  // Status and the multi-product picker belong to the Detail Table
-  ['statusFilterLabel','statusFilterSel','productMultiLabel','productMulti'].forEach(id=>{ const e=document.getElementById(id); if(e) e.style.display = v==='detail' ? '' : 'none'; });
-  if(v!=='detail') setProductMultiOpen(false);
+  // Status belongs to the Detail Table; the Products picker works on both tabs
+  ['statusFilterLabel','statusFilterSel'].forEach(id=>{ const e=document.getElementById(id); if(e) e.style.display = v==='detail' ? '' : 'none'; });
+  setProductMultiOpen(false);
   applyDetailWeekFilter();
   renderAll();
 }
@@ -1454,7 +1459,8 @@ function getTypeColor(type, allTypes){
 }
 
 function renderTypeChart(){
-  document.getElementById('typeChartTitle').textContent = `Sales by Product Type — ${activeRetailer}`;
+  syncDetailExtraFilters();
+  document.getElementById('typeChartTitle').textContent = `${detailProducts.size ? 'Sales by Product' : 'Sales by Product Type'} — ${activeRetailer}`;
 
   // Collect all products visible for current retailer
   const retailers = activeRetailer==='All' ? getRetailers() : [activeRetailer];
@@ -1501,7 +1507,7 @@ function renderTypeChart(){
   const prodSel = document.getElementById('productFilterSel');
   const prodLabel = document.getElementById('productFilterLabel');
   if(prodSel && prodLabel){
-    if(isLockType){
+    if(false){ // the single Product dropdown is replaced by the Products picker (tick several products)
       const typeProds = brandFiltered.filter(p => (p.type||'Unknown') === activeType);
       const prodNames = [...new Set(typeProds.map(p => p.name))].sort();
       if(!prodNames.includes(activeProduct)) activeProduct = 'ALL';
@@ -1517,7 +1523,7 @@ function renderTypeChart(){
 
   // Series pills (for Safes only)
   if(pillsEl){
-    if(isSafes){
+    if(isSafes && detailProducts.size===0){
       const availSeries = rawTypes.filter(t => SAFE_SERIES.includes(t)).sort();
       pillsEl.style.display = 'flex';
       pillsEl.innerHTML = ['ALL', ...availSeries].map(s => {
@@ -1547,7 +1553,15 @@ function renderTypeChart(){
   const labels = getWeekLabels();
   let datasets = [];
 
-  if(isSafes){
+  if(detailProducts.size > 0){
+    // products ticked in the Products picker: one line per product (Brand and Type still apply)
+    brandFiltered.filter(p => typeOk(p) && detailProducts.has(p.name)).forEach((p, idx) => {
+      const data = labels.map(wk => { const i = WEEKS.indexOf(wk); return p.weekly[i]||0; });
+      const color = TYPE_COLORS[idx % TYPE_COLORS.length];
+      const label = activeRetailer === 'All' ? `${p.name} · ${p.retailer}` : p.name;
+      datasets.push({ label, data, borderColor: color, backgroundColor: color+'33', borderWidth: 2, pointRadius: 3, pointHoverRadius: 5, tension: 0.3, fill: false });
+    });
+  } else if(isSafes){
     if(activeSeries === 'ALL'){
       // One line per series
       const seriesInView = [...new Set(filtered.map(p => p.type||'Unknown'))].sort();
