@@ -406,6 +406,14 @@ body {
 .st-sel[data-state="online"] { color: var(--green); border-color: rgba(48,209,88,0.55); background: rgba(48,209,88,0.1); }
 .st-sel[data-state="offline"] { color: var(--amber); border-color: rgba(255,159,10,0.55); background: rgba(255,159,10,0.1); }
 .st-sel[data-state="eol"] { color: var(--red); border-color: rgba(255,69,58,0.55); background: rgba(255,69,58,0.1); }
+.so-table thead th.col-arch { min-width: 92px; width: 92px; color: var(--text-2); }
+.so-table td.col-arch { min-width: 92px; width: 92px; padding: 3px 6px; }
+.arch-btn { width: 100%; background: transparent; border: 1px solid var(--border-strong); border-radius: 6px; color: var(--text-2); font: inherit; font-size: 11px; padding: 3px 4px; cursor: pointer; }
+.arch-btn:hover { background: rgba(255,255,255,0.08); color: var(--text); }
+.so-table tbody tr.row-archived td.col-name .name-editable { color: var(--text-3); text-decoration: line-through; }
+.so-table tbody tr.row-archived td.col-type, .so-table tbody tr.row-archived td.col-total { color: var(--text-3); }
+.so-table tbody tr.row-archived td[data-w] { filter: grayscale(1) opacity(0.45); }
+.so-table tbody tr.row-archived .arch-btn { color: var(--blue-light); border-color: rgba(10,132,255,0.5); }
 .toolbar { position: relative; z-index: 30; } /* keeps the product picker above the table headers */
 .ms-wrap { position: relative; display: inline-block; }
 .ms-btn { cursor: pointer; text-align: left; min-width: 130px; }
@@ -614,6 +622,12 @@ body {
           <option value="eol">EOL (End of Line)</option>
           <option value="NONE">Not Set</option>
         </select>
+        <span class="wk-label" id="archiveFilterLabel" style="display:none">Archived</span>
+        <select class="wk-sel" id="archiveFilterSel" style="min-width:140px;display:none" onchange="setArchiveView(this.value)">
+          <option value="HIDE">Hide Archived</option>
+          <option value="SHOW">Show Archived</option>
+          <option value="ONLY">Archived Only</option>
+        </select>
         <span class="wk-label" id="productMultiLabel">Products</span>
         <div class="ms-wrap" id="productMulti">
           <button type="button" class="wk-sel ms-btn" id="productMultiBtn" aria-haspopup="true" aria-expanded="false">All Products ▾</button>
@@ -774,7 +788,7 @@ async function saveToSupabase(){
             for(let i=0;i<raw.length;i++){ h = Math.imul(31,h)+raw.charCodeAt(i)|0; }
             p.id = 'p_' + Math.abs(h).toString(36) + '_' + raw.slice(0,12);
           }
-          allProducts.push({ id:p.id, section_id:secId, retailer_id:rId, name:p.name, type:p.type||'', online_status:p.online||null, total:p.total, sort_order:pIdx });
+          allProducts.push({ id:p.id, section_id:secId, retailer_id:rId, name:p.name, type:p.type||'', online_status:p.online||null, archived:!!p.archived, total:p.total, sort_order:pIdx });
           p.weekly.forEach((qty,wi)=>{
             allSales.push({ id:p.id+'__'+wi, product_id:p.id, week_label:WEEK_HEADERS[wi]?.wk||'WK'+(27+wi), qty });
           });
@@ -874,7 +888,7 @@ async function loadFromSupabase(){
       const sec = sections.find(s => s.id === p.section_id);
       if(!r || !sec) return;
       const weekly = WEEK_HEADERS.map(h => salesByProduct[p.id]?.[h.wk] || 0);
-      newEdit[r.name].sections[sec.name].products.push({ id:p.id, name:p.name, type:p.type||'', online:p.online_status||'', total:p.total, weekly });
+      newEdit[r.name].sections[sec.name].products.push({ id:p.id, name:p.name, type:p.type||'', online:p.online_status||'', archived:!!p.archived, total:p.total, weekly });
     });
 
     // Apply to EDIT
@@ -1029,7 +1043,7 @@ function getWeekLabels(){return WEEKS.slice(wkFrom,wkTo+1);}
 function getWeeklyTotals(retailer){
   if(!EDIT[retailer])return new Array(WEEKS.length).fill(0);
   const t=new Array(WEEKS.length).fill(0);
-  Object.values(EDIT[retailer].sections).forEach(sec=>sec.products.forEach(p=>{
+  Object.values(EDIT[retailer].sections).forEach(sec=>sec.products.filter(notArchived).forEach(p=>{
     for(let i=0;i<WEEKS.length;i++) t[i]+=(p.weekly[i]||0);
   }));
   return t;
@@ -1041,7 +1055,7 @@ function getAllProducts(){
   getRetailers().forEach(r=>{
     Object.entries(EDIT[r]?EDIT[r].sections:{}).forEach(([sec,sd])=>{
       if(activeSection!=='ALL'&&sec!==activeSection)return;
-      sd.products.forEach(p=>{if(p.total>0)out.push({...p,retailer:r,section:sec});});
+      sd.products.filter(notArchived).forEach(p=>{if(p.total>0)out.push({...p,retailer:r,section:sec});});
     });
   });
   return out.sort((a,b)=>b.total-a.total);
@@ -1049,7 +1063,7 @@ function getAllProducts(){
 function getCatTotals(){
   const cats={};
   getRetailers().forEach(r=>Object.entries(EDIT[r]?EDIT[r].sections:{}).forEach(([sec,sd])=>{
-    const t=sd.products.filter(p=>p.total>0).reduce((s,p)=>s+p.total,0);
+    const t=sd.products.filter(p=>p.total>0 && !p.archived).reduce((s,p)=>s+p.total,0);
     if(t>0)cats[sec]=(cats[sec]||0)+t;
   }));
   return cats;
@@ -1094,7 +1108,7 @@ function renderTop5(){
   const prodMap = {};
   rets.forEach(r => {
     Object.values(EDIT[r]?.sections||{}).forEach(sec => {
-      sec.products.forEach(p => {
+      sec.products.filter(notArchived).forEach(p => {
         const qty = p.weekly[wkTo]||0;
         if(qty > 0){
           if(!prodMap[p.name]) prodMap[p.name] = { name:p.name, qty:0 };
@@ -1135,7 +1149,7 @@ function renderSlowMovers(){
   const slow = [];
   rets.forEach(r => {
     Object.entries(EDIT[r]?.sections||{}).forEach(([secName, sec]) => {
-      sec.products.forEach(p => {
+      sec.products.filter(notArchived).forEach(p => {
         const recentQty = p.weekly.slice(startIdx, wkTo+1).reduce((a,b)=>a+(b||0),0);
         if(recentQty === 0 && p.total > 0) {
           slow.push({ name:p.name, retailer:r, brand: secName.replace(' SOLD',''), total:p.total });
@@ -1179,7 +1193,11 @@ function typeOk(p){
   const t = p.type || 'Unknown';
   return activeType==='Safes' ? SAFE_SERIES.includes(t) : t===activeType;
 }
-function typeMatches(p){
+// Archive: archived products stay in the database but are left out of every total and chart.
+// archiveView is a Detail Table choice: 'HIDE' (default), 'SHOW' (dimmed rows, still not counted) or 'ONLY'.
+let archiveView = 'HIDE';
+function notArchived(p){ return !p.archived; }
+function filtersOk(p){
   if(detailStatus!=='ALL'){
     const s = p.online || '';
     if(detailStatus==='NONE' ? s!=='' : s!==detailStatus) return false;
@@ -1187,13 +1205,31 @@ function typeMatches(p){
   if(detailProducts.size && !detailProducts.has(p.name)) return false;
   return typeOk(p);
 }
-function detailFiltersOn(){ return activeBrand!=='ALL' || activeType!=='ALL' || detailStatus!=='ALL' || detailProducts.size>0; }
+// counts towards totals: passes the filters, and is archived only in the Archived Only view
+function typeMatches(p){ return filtersOk(p) && (archiveView==='ONLY' ? !!p.archived : !p.archived); }
+// shown as a row in the Detail Table
+function rowShown(p){ return filtersOk(p) && (archiveView==='SHOW' ? true : archiveView==='ONLY' ? !!p.archived : !p.archived); }
+function shownProds(secName, prods){ return brandMatches(secName) ? prods.filter(rowShown) : []; }
+// product lists (picker, Brand and Type options) include archived items only while the Detail Table is showing them
+function listArchivedOk(p){ return !p.archived || (currentView==='detail' && archiveView!=='HIDE'); }
+function detailFiltersOn(){ return activeBrand!=='ALL' || activeType!=='ALL' || detailStatus!=='ALL' || detailProducts.size>0 || archiveView!=='HIDE'; }
 function statusOk(p){
   if(detailStatus==='ALL') return true;
   const s = p.online || '';
   return detailStatus==='NONE' ? s==='' : s===detailStatus;
 }
 function setDetailStatus(v){ detailStatus = v; refreshProductView(); }
+function setArchiveView(v){ archiveView = v; renderDetail(); }
+// Archive or unarchive one product at one retailer, then refresh every total that depends on it
+function setArchived(retailer, secName, pIdx, flag){
+  const sec = EDIT[retailer] && EDIT[retailer].sections[secName];
+  const p = sec && sec.products[pIdx];
+  if(!p) return;
+  p.archived = !!flag;
+  recalcTotals(retailer, secName);
+  debouncedSave();
+  renderDetail();
+}
 // The Products picker works on both tabs: Detail Table rows or the Overview "Sales by Product" chart
 function refreshProductView(){
   if(currentView==='detail') renderDetail();
@@ -1205,12 +1241,20 @@ function detailProductNames(){
   const names = new Set(detailProducts);
   retailers.forEach(r=>Object.entries((EDIT[r]&&EDIT[r].sections)||{}).forEach(([sn,sec])=>{
     if(!brandMatches(sn)) return;
-    sec.products.forEach(p=>{ if(typeOk(p)) names.add(p.name); });
+    sec.products.forEach(p=>{ if(typeOk(p) && listArchivedOk(p)) names.add(p.name); });
   }));
   return [...names].sort((a,b)=>a.localeCompare(b));
 }
 function syncDetailExtraFilters(){
   const ss = document.getElementById('statusFilterSel'); if(ss) ss.value = detailStatus;
+  const as = document.getElementById('archiveFilterSel');
+  if(as){
+    let n = 0;
+    (activeRetailer==='All' ? Object.keys(EDIT) : [activeRetailer]).forEach(r=>Object.values((EDIT[r]&&EDIT[r].sections)||{}).forEach(s=>s.products.forEach(p=>{ if(p.archived) n++; })));
+    as.options[1].textContent = 'Show Archived (' + n + ')';
+    as.options[2].textContent = 'Archived Only (' + n + ')';
+    as.value = archiveView;
+  }
   const btn = document.getElementById('productMultiBtn');
   if(btn){ const n = detailProducts.size; btn.textContent = (n ? (n===1 ? '1 Product' : n+' Products') : 'All Products') + ' ▾'; btn.classList.toggle('on', n>0); }
 }
@@ -1259,7 +1303,7 @@ function allRangeTotal(){ return Object.values(EDIT).reduce((s,rd)=>s+retailerRa
 function syncDetailFilterOptions(){
   const retailers = activeRetailer==='All' ? Object.keys(EDIT) : [activeRetailer];
   const allProds = [];
-  retailers.forEach(r=>Object.entries((EDIT[r]&&EDIT[r].sections)||{}).forEach(([secName,sec])=>sec.products.forEach(p=>allProds.push({type:p.type, secName}))));
+  retailers.forEach(r=>Object.entries((EDIT[r]&&EDIT[r].sections)||{}).forEach(([secName,sec])=>sec.products.forEach(p=>{ if(listArchivedOk(p)) allProds.push({type:p.type, secName}); })));
   const allBrands = [...new Set(allProds.map(p=>p.secName.replace(' SOLD','')))].sort();
   const brandSel = document.getElementById('brandFilterSel');
   if(!allBrands.includes(activeBrand)) activeBrand = 'ALL';
@@ -1322,7 +1366,7 @@ function renderRetailerTabs(){
     const b=document.createElement('button');
     b.className='pill'+(r===activeRetailer?' active':'');
     b.textContent=r;
-    b.onclick=()=>{activeRetailer=r;activeType='ALL';activeBrand='ALL';activeSeries='ALL';activeProduct='ALL';detailStatus='ALL';detailProducts.clear();document.querySelectorAll('.pill').forEach(t=>t.classList.remove('active'));b.classList.add('active');renderAll();};
+    b.onclick=()=>{activeRetailer=r;activeType='ALL';activeBrand='ALL';activeSeries='ALL';activeProduct='ALL';detailStatus='ALL';detailProducts.clear();archiveView='HIDE';document.querySelectorAll('.pill').forEach(t=>t.classList.remove('active'));b.classList.add('active');renderAll();};
     tabsEl.appendChild(b);
   });
 }
@@ -1341,7 +1385,8 @@ function switchView(v,btn){
   if(v==='detail'){ // the Product dropdown only applies to the Overview chart
     ['productFilterLabel','productFilterSel'].forEach(id=>{ const e=document.getElementById(id); if(e) e.style.display='none'; });
   }
-  // Status and the Products picker work on both tabs
+  // Status and the Products picker work on both tabs; Archived only applies to the Detail Table
+  ['archiveFilterLabel','archiveFilterSel'].forEach(id=>{ const e=document.getElementById(id); if(e) e.style.display = v==='detail' ? '' : 'none'; });
   setProductMultiOpen(false);
   applyDetailWeekFilter();
   renderAll();
@@ -1351,14 +1396,14 @@ function switchView(v,btn){
 function renderKpis(){
   const rets=getRetailers();
   // Calculate grand total from weekly arrays (accurate, includes all weeks)
-  const grand=rets.reduce((s,r)=>s+Object.values(EDIT[r]?.sections||{}).reduce((ss,sec)=>ss+sec.products.reduce((ps,p)=>ps+p.weekly.slice(wkFrom,wkTo+1).reduce((a,b)=>a+b,0),0),0),0);
+  const grand=rets.reduce((s,r)=>s+Object.values(EDIT[r]?.sections||{}).reduce((ss,sec)=>ss+sec.products.filter(notArchived).reduce((ps,p)=>ps+p.weekly.slice(wkFrom,wkTo+1).reduce((a,b)=>a+b,0),0),0),0);
   const wkSlice=getCombinedWeekly().slice(wkFrom,wkTo+1).filter(v=>v>0);
   const avg=wkSlice.length?Math.round(wkSlice.reduce((a,b)=>a+b,0)/wkSlice.length):0;
   const peak=Math.max(...wkSlice,0);
   const peakWk=WEEKS[wkFrom+wkSlice.indexOf(peak)]||'';
   let plocks=0,psafes=0,ddl=0,zigbang=0;
   rets.forEach(r=>Object.entries(EDIT[r]?EDIT[r].sections:{}).forEach(([sec,sd])=>{
-    const t=sd.products.reduce((s,p)=>s+p.weekly.slice(wkFrom,wkTo+1).reduce((a,b)=>a+b,0),0);
+    const t=sd.products.filter(notArchived).reduce((s,p)=>s+p.weekly.slice(wkFrom,wkTo+1).reduce((a,b)=>a+b,0),0);
     if(sec.includes('PHILIPS LOCKS'))plocks+=t;
     else if(sec.includes('SAFES'))psafes+=t;
     else if(sec.includes('ZIGBANG'))zigbang+=t;
@@ -1483,7 +1528,7 @@ function renderTypeChart(){
   const allProds = [];
   retailers.forEach(r => {
     Object.entries(EDIT[r]?.sections||{}).forEach(([secName, sec]) => {
-      sec.products.forEach(p => allProds.push({...p, retailer: r, secName}));
+      sec.products.filter(notArchived).forEach(p => allProds.push({...p, retailer: r, secName}));
     });
   });
 
@@ -1696,7 +1741,7 @@ function renderSparks(){
       <div class="spark-top">
         <div style="min-width:0;flex:1;overflow:hidden">
           <div class="spark-name">${r}</div>
-          <div class="spark-total" style="color:${rColor}">${Object.values(EDIT[r]?.sections||{}).reduce((s,sec)=>s+sec.products.reduce((ps,p)=>ps+p.weekly.slice(wkFrom,wkTo+1).reduce((a,b)=>a+b,0),0),0).toLocaleString()}</div>
+          <div class="spark-total" style="color:${rColor}">${Object.values(EDIT[r]?.sections||{}).reduce((s,sec)=>s+sec.products.filter(notArchived).reduce((ps,p)=>ps+p.weekly.slice(wkFrom,wkTo+1).reduce((a,b)=>a+b,0),0),0).toLocaleString()}</div>
         </div>
         <div class="spark-peak">
           <div class="spark-peak-val" style="color:${rColor}">${peak}</div>
@@ -1721,7 +1766,7 @@ function debouncedSave(){
 function recalcTotalsOnly(retailer, secName){
   const sec=EDIT[retailer].sections[secName];
   sec.products.forEach(p=>{ p.total=p.weekly.reduce((a,b)=>a+b,0); });
-  sec.total=sec.products.reduce((s,p)=>s+p.total,0);
+  sec.total=sec.products.filter(notArchived).reduce((s,p)=>s+p.total,0);
   EDIT[retailer].total=Object.values(EDIT[retailer].sections).reduce((s,sd)=>s+sd.total,0);
   EDIT[retailer].weekly_totals=getWeeklyTotals(retailer);
 }
@@ -1760,7 +1805,7 @@ function updateTotalCells(retailer, secName){
 function recalcTotals(retailer, secName){
   const sec=EDIT[retailer].sections[secName];
   sec.products.forEach(p=>{ p.total=p.weekly.reduce((a,b)=>a+b,0); });
-  sec.total=sec.products.reduce((s,p)=>s+p.total,0);
+  sec.total=sec.products.filter(notArchived).reduce((s,p)=>s+p.total,0);
   EDIT[retailer].total=Object.values(EDIT[retailer].sections).reduce((s,sd)=>s+sd.total,0);
   EDIT[retailer].weekly_totals=getWeeklyTotals(retailer);
   // callers are responsible for triggering debouncedSave
@@ -1920,7 +1965,7 @@ function rebuildSectionTable(retailer, secName){
   const thead = document.querySelector(`#tb_${sid}`)?.closest('table')?.querySelector('thead tr');
   if(thead){
     const cols = getSecCols(retailer, secName);
-    let th = `<th class="col-num">#</th><th class="col-name">Product</th><th class="col-type">Type</th><th class="col-status">Status</th>${totalHeaderHtml(retailer, secName)}`;
+    let th = `<th class="col-num">#</th><th class="col-name">Product</th><th class="col-type">Type</th><th class="col-status">Status</th><th class="col-arch">Archive</th>${totalHeaderHtml(retailer, secName)}`;
     cols.forEach((h,ci)=>{
       th += `<th data-w="${ci}" style="min-width:80px;width:80px;">
         <div style="display:flex;align-items:center;justify-content:center;gap:3px">
@@ -2044,7 +2089,7 @@ function renderTbody(tbody, retailer, secName, secData, secColor){
   const maxProd=Math.max(...visList.map(p=>rangeSum(p.weekly)),1);
   const sortMode=SEC_SORT[retailer+'__'+secName]||null;
   const rowTotals=prods.map(p=>rangeSum(p.weekly));
-  const order=prods.map((_,i)=>i).filter(i=>typeMatches(prods[i]));
+  const order=prods.map((_,i)=>i).filter(i=>rowShown(prods[i]));
   if(sortMode) order.sort((a,b)=>(sortMode==='desc'?rowTotals[b]-rowTotals[a]:rowTotals[a]-rowTotals[b])||(a-b));
   order.forEach((pIdx,dIdx)=>{
     const p=prods[pIdx];
@@ -2057,6 +2102,7 @@ function renderTbody(tbody, retailer, secName, secData, secColor){
     const barPct=Math.round(Math.max(_pTotal,0)/maxProd*100);
     const tr=document.createElement('tr');
     tr.dataset.pidx=pIdx;
+    if(p.archived) tr.classList.add('row-archived');
     // number td
     const numtd=document.createElement('td'); numtd.className='col-num';
     numtd.textContent=dIdx+1; tr.appendChild(numtd);
@@ -2094,6 +2140,13 @@ function renderTbody(tbody, retailer, secName, secData, secColor){
       if(detailStatus!=='ALL') refreshSection(retailer,secName);
     });
     sttd.appendChild(ssel); tr.appendChild(sttd);
+    // archive td (Archive / Unarchive this product at this retailer)
+    const artd=document.createElement('td'); artd.className='col-arch';
+    const abtn=document.createElement('button'); abtn.type='button'; abtn.className='arch-btn';
+    abtn.textContent=p.archived?'Unarchive':'Archive';
+    abtn.setAttribute('aria-label',(p.archived?'Unarchive ':'Archive ')+p.name+' at '+retailer);
+    abtn.addEventListener('click',()=>setArchived(retailer,secName,pIdx,!p.archived));
+    artd.appendChild(abtn); tr.appendChild(artd);
     // total td
     const ttd=document.createElement('td'); ttd.className='col-total';
     const _pt=rangeSum(p.weekly);
@@ -2144,7 +2197,7 @@ function renderTbody(tbody, retailer, secName, secData, secColor){
   const wt=new Array(nCols).fill(0);
   visList.forEach(p=>{ const wk=p.weekly.slice(0,nCols); wk.forEach((v,i)=>wt[i]+=(v||0)); });
   const ttr=document.createElement('tr'); ttr.className='wk-total-row';
-  ttr.innerHTML=`<td class="col-num"></td><td class="col-name">Weekly Total</td><td class="col-type"></td><td class="col-status"></td><td class="col-total">${wt.slice(wkFrom,wkTo+1).reduce((a,b)=>a+b,0)||'—'}</td>`;
+  ttr.innerHTML=`<td class="col-num"></td><td class="col-name">Weekly Total</td><td class="col-type"></td><td class="col-status"></td><td class="col-arch"></td><td class="col-total">${wt.slice(wkFrom,wkTo+1).reduce((a,b)=>a+b,0)||'—'}</td>`;
   wt.forEach((v,i)=>{ const td=document.createElement('td'); td.dataset.w=i; td.textContent=v||'—'; ttr.appendChild(td); });
   const etd=document.createElement('td'); ttr.appendChild(etd);
   tbody.appendChild(ttr);
@@ -2162,7 +2215,7 @@ function buildSectionBlock(retailer, secName, secData, secColor){
   const scroll=document.createElement('div'); scroll.className='tbl-scroll';
   const tbl=document.createElement('table'); tbl.className='so-table';
   const cols0=getSecCols(retailer, secName);
-  let th=`<th class="col-num">#</th><th class="col-name">Product</th><th class="col-type">Type</th><th class="col-status">Status</th>${totalHeaderHtml(retailer, secName)}`;
+  let th=`<th class="col-num">#</th><th class="col-name">Product</th><th class="col-type">Type</th><th class="col-status">Status</th><th class="col-arch">Archive</th>${totalHeaderHtml(retailer, secName)}`;
   cols0.forEach((h,ci)=>{
     th+=`<th data-w="${ci}" style="min-width:80px;width:80px;">
       <div style="display:flex;align-items:center;justify-content:center;gap:3px">
@@ -2242,7 +2295,7 @@ function refreshDetailHeader(){
 function addProduct(retailer, secName){
   const p={name:'New Product',total:0,weekly:new Array(WEEK_HEADERS.length).fill(0),id:uid('p_')};
   EDIT[retailer].sections[secName].products.push(p);
-  if(activeType!=='ALL'||detailStatus!=='ALL'||detailProducts.size>0){ activeType='ALL'; detailStatus='ALL'; detailProducts.clear(); renderDetail(); } else refreshSection(retailer,secName);
+  if(activeType!=='ALL'||detailStatus!=='ALL'||detailProducts.size>0||archiveView==='ONLY'){ activeType='ALL'; detailStatus='ALL'; detailProducts.clear(); archiveView='HIDE'; renderDetail(); } else refreshSection(retailer,secName);
   debouncedSave();
 }
 function removeSection(retailer, secName){
@@ -2286,7 +2339,7 @@ function renderRetailerBlock(container, retailer){
   const rd=EDIT[retailer];
   const color=colorForRetailer(retailer);
   const _filtered=detailFiltersOn();
-  const _secs=Object.entries(rd.sections).filter(([sn,sd])=>!_filtered||visProds(sn,sd.products).length>0);
+  const _secs=Object.entries(rd.sections).filter(([sn,sd])=>!_filtered||shownProds(sn,sd.products).length>0);
   if(_filtered && _secs.length===0 && activeRetailer==='All') return;
   if(activeRetailer==='All'){
     const h=document.createElement('div'); h.className='ret-heading';
