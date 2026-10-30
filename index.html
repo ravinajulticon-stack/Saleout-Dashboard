@@ -595,8 +595,8 @@ body {
         <select class="wk-sel" id="typeFilterSel" style="min-width:110px" onchange="setActiveType(this.value)">
           <option value="ALL">All Types</option>
         </select>
-        <span class="wk-label" id="statusFilterLabel" style="display:none">Status</span>
-        <select class="wk-sel" id="statusFilterSel" style="min-width:110px;display:none" onchange="setDetailStatus(this.value)">
+        <span class="wk-label" id="statusFilterLabel">Status</span>
+        <select class="wk-sel" id="statusFilterSel" style="min-width:110px" onchange="setDetailStatus(this.value)">
           <option value="ALL">All Statuses</option>
           <option value="online">Online</option>
           <option value="offline">Offline</option>
@@ -1176,7 +1176,12 @@ function typeMatches(p){
   return typeOk(p);
 }
 function detailFiltersOn(){ return activeBrand!=='ALL' || activeType!=='ALL' || detailStatus!=='ALL' || detailProducts.size>0; }
-function setDetailStatus(v){ detailStatus = v; renderDetail(); }
+function statusOk(p){
+  if(detailStatus==='ALL') return true;
+  const s = p.online || '';
+  return detailStatus==='NONE' ? s==='' : s===detailStatus;
+}
+function setDetailStatus(v){ detailStatus = v; refreshProductView(); }
 // The Products picker works on both tabs: Detail Table rows or the Overview "Sales by Product" chart
 function refreshProductView(){
   if(currentView==='detail') renderDetail();
@@ -1324,8 +1329,7 @@ function switchView(v,btn){
   if(v==='detail'){ // the Product dropdown only applies to the Overview chart
     ['productFilterLabel','productFilterSel'].forEach(id=>{ const e=document.getElementById(id); if(e) e.style.display='none'; });
   }
-  // Status belongs to the Detail Table; the Products picker works on both tabs
-  ['statusFilterLabel','statusFilterSel'].forEach(id=>{ const e=document.getElementById(id); if(e) e.style.display = v==='detail' ? '' : 'none'; });
+  // Status and the Products picker work on both tabs
   setProductMultiOpen(false);
   applyDetailWeekFilter();
   renderAll();
@@ -1482,7 +1486,7 @@ function renderTypeChart(){
   }
 
   // Filter by brand first
-  const brandFiltered = activeBrand==='ALL' ? allProds : allProds.filter(p => p.secName.replace(' SOLD','')=== activeBrand);
+  const brandFiltered = (activeBrand==='ALL' ? allProds : allProds.filter(p => p.secName.replace(' SOLD','')=== activeBrand)).filter(statusOk);
 
   // Get unique types — group all safe series under "Philips Safes"
   const rawTypes = [...new Set(brandFiltered.map(p => p.type||'Unknown'))].sort();
