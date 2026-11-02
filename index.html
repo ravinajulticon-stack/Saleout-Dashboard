@@ -286,6 +286,21 @@ body {
   gap: 12px;
 }
 .detail-retailer { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; color: var(--text); }
+.status-tiles { flex: 1; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; padding: 0 16px; }
+.stile { display: flex; flex-direction: column; align-items: center; min-width: 76px; padding: 6px 12px; border-radius: 10px; border: 1px solid var(--border-strong); background: var(--surface-1); color: var(--text-2); font: inherit; cursor: pointer; }
+.stile .n { font-size: 18px; font-weight: 700; line-height: 1.1; }
+.stile .l { font-size: 10px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; }
+.stile.online .n { color: var(--green); }
+.stile.offline .n { color: var(--amber); }
+.stile.eol .n { color: var(--red); }
+.stile.notset .n { color: var(--text-2); }
+.stile.archived .n { color: var(--text-3); }
+.stile:hover { background: rgba(255,255,255,0.08); }
+.stile.active { border-color: var(--blue); box-shadow: 0 0 0 1px var(--blue) inset; }
+@media (max-width: 900px) {
+  .detail-top { flex-wrap: wrap; }
+  .status-tiles { order: 3; flex-basis: 100%; justify-content: flex-start; padding: 8px 0 0; }
+}
 .detail-badge {
   background: var(--blue);
   border-radius: 10px;
@@ -716,6 +731,7 @@ body {
         <div style="font-size:10px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:4px">Retailer</div>
         <div class="detail-retailer" id="detailRetailerName">All Retailers</div>
       </div>
+      <div class="status-tiles" id="detailStatusTiles" role="group" aria-label="Products by status"></div>
       <div style="text-align:right">
         <div style="font-size:10px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:4px">Total Units</div>
         <div class="detail-badge" id="detailTotalBadge">0</div>
@@ -1220,6 +1236,34 @@ function statusOk(p){
 }
 function setDetailStatus(v){ detailStatus = v; refreshProductView(); }
 function setArchiveView(v){ archiveView = v; renderDetail(); }
+// Products by status for the retailer(s) in view. Archived products are counted only as Archived.
+// The tiles ignore the other filters so the picture stays steady; clicking a tile filters the table.
+function statusCounts(){
+  const c = {online:0, offline:0, eol:0, notset:0, archived:0};
+  (activeRetailer==='All' ? Object.keys(EDIT) : [activeRetailer]).forEach(r=>Object.values((EDIT[r]&&EDIT[r].sections)||{}).forEach(s=>s.products.forEach(p=>{
+    if(p.archived) c.archived++; else c[p.online || 'notset']++;
+  })));
+  return c;
+}
+function tileActive(k){ return k==='archived' ? archiveView==='ONLY' : (archiveView==='HIDE' && detailStatus===(k==='notset' ? 'NONE' : k)); }
+function renderStatusTiles(){
+  const box = document.getElementById('detailStatusTiles'); if(!box) return;
+  const c = statusCounts();
+  box.innerHTML = [['online','Online'],['offline','Offline'],['eol','EOL'],['notset','Not Set'],['archived','Archived']].map(([k,l])=>{
+    const on = tileActive(k);
+    return '<button type="button" class="stile '+k+(on?' active':'')+'" data-k="'+k+'" aria-pressed="'+on+'" aria-label="'+l+': '+c[k]+' products. Click to filter the table."><span class="n">'+c[k]+'</span><span class="l">'+l+'</span></button>';
+  }).join('');
+}
+function applyStatusTile(k){
+  if(tileActive(k)){ detailStatus='ALL'; archiveView='HIDE'; }
+  else if(k==='archived'){ detailStatus='ALL'; archiveView='ONLY'; }
+  else { detailStatus = (k==='notset' ? 'NONE' : k); archiveView='HIDE'; }
+  renderDetail();
+}
+(function wireStatusTiles(){
+  const box = document.getElementById('detailStatusTiles'); if(!box) return;
+  box.addEventListener('click', e=>{ const b = e.target.closest('.stile'); if(b) applyStatusTile(b.dataset.k); });
+})();
 // Archive or unarchive one product at one retailer, then refresh every total that depends on it
 function setArchived(retailer, secName, pIdx, flag){
   const sec = EDIT[retailer] && EDIT[retailer].sections[secName];
@@ -2137,6 +2181,7 @@ function renderTbody(tbody, retailer, secName, secData, secColor){
       EDIT[retailer].sections[secName].products[pIdx].online=ssel.value;
       ssel.dataset.state=ssel.value;
       debouncedSave();
+      renderStatusTiles();
       if(detailStatus!=='ALL') refreshSection(retailer,secName);
     });
     sttd.appendChild(ssel); tr.appendChild(sttd);
@@ -2290,6 +2335,7 @@ function refreshDetailHeader(){
     const _rd=EDIT[activeRetailer];
     document.getElementById('detailTotalBadge').textContent=retailerRangeTotal(_rd).toLocaleString();
   }
+  renderStatusTiles();
 }
 
 function addProduct(retailer, secName){
@@ -2355,6 +2401,7 @@ function renderRetailerBlock(container, retailer){
 function renderDetail(){
   syncDetailFilterOptions();
   syncDetailExtraFilters();
+  renderStatusTiles();
   const container=document.getElementById('detailSections');
   container.innerHTML='';
   const isAll=activeRetailer==='All';
