@@ -804,7 +804,7 @@ async function saveToSupabase(){
             for(let i=0;i<raw.length;i++){ h = Math.imul(31,h)+raw.charCodeAt(i)|0; }
             p.id = 'p_' + Math.abs(h).toString(36) + '_' + raw.slice(0,12);
           }
-          allProducts.push({ id:p.id, section_id:secId, retailer_id:rId, name:p.name, type:p.type||'', online_status:p.online||null, archived:!!p.archived, total:p.total, sort_order:pIdx });
+          allProducts.push({ id:p.id, section_id:secId, retailer_id:rId, name:p.name, type:p.type||'', online_status:p.online||(p.statusCleared?'none':null), archived:!!p.archived, total:p.total, sort_order:pIdx });
           p.weekly.forEach((qty,wi)=>{
             allSales.push({ id:p.id+'__'+wi, product_id:p.id, week_label:WEEK_HEADERS[wi]?.wk||'WK'+(27+wi), qty });
           });
@@ -904,7 +904,7 @@ async function loadFromSupabase(){
       const sec = sections.find(s => s.id === p.section_id);
       if(!r || !sec) return;
       const weekly = WEEK_HEADERS.map(h => salesByProduct[p.id]?.[h.wk] || 0);
-      newEdit[r.name].sections[sec.name].products.push({ id:p.id, name:p.name, type:p.type||'', online:p.online_status||'', archived:!!p.archived, total:p.total, weekly });
+      newEdit[r.name].sections[sec.name].products.push({ id:p.id, name:p.name, type:p.type||'', online:(p.online_status&&p.online_status!=='none')?p.online_status:'', archived:!!p.archived, total:p.total, weekly });
     });
 
     // Apply to EDIT
@@ -2178,7 +2178,8 @@ function renderTbody(tbody, retailer, secName, secData, secColor){
     [['','Not set'],['online','Online'],['offline','Offline'],['eol','EOL']].forEach(([v,l])=>{ const o=document.createElement('option'); o.value=v; o.textContent=l; ssel.appendChild(o); });
     ssel.value=p.online||''; ssel.dataset.state=p.online||'';
     ssel.addEventListener('change',()=>{
-      EDIT[retailer].sections[secName].products[pIdx].online=ssel.value;
+      const _pr=EDIT[retailer].sections[secName].products[pIdx];
+      _pr.online=ssel.value; _pr.statusCleared=(ssel.value==='');
       ssel.dataset.state=ssel.value;
       debouncedSave();
       renderStatusTiles();
