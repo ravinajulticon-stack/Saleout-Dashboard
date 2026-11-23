@@ -2586,7 +2586,7 @@ function renderStock(){
   const prevScopeTotal = prev ? scope.reduce((s, r) => s + (prev.reporting[r] ? prev.totals[r] : 0), 0) : 0;
   const reportingCount = STOCK_RETAILERS.filter(r => cur.reporting[r]).length;
   let tiles = '<div class="stock-tile total"><div class="l">Total On Hand</div><div class="v">' + stNum(scopeTotal) + '</div><div class="d">' + (prev ? delta(scopeTotal, prevScopeTotal, true) : reportingCount + ' of ' + STOCK_RETAILERS.length + ' retailers reporting') + '</div></div>';
-  STOCK_RETAILERS.forEach(r => {
+  scope.forEach(r => {
     if(cur.reporting[r]) tiles += '<div class="stock-tile"><div class="l">' + stEsc(r) + '</div><div class="v">' + stNum(cur.totals[r]) + '</div><div class="d">' + delta(cur.totals[r], prev ? prev.totals[r] : 0, prev ? prev.reporting[r] : false) + '</div></div>';
     else tiles += '<div class="stock-tile pending"><div class="l">' + stEsc(r) + '</div><div class="v">\u2014</div><div class="d">No stock report yet</div></div>';
   });
