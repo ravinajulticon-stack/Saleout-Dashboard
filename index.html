@@ -285,6 +285,34 @@ body {
   gap: 12px;
 }
 .detail-top > :last-child { justify-self: end; }
+/* Stock On Hand tab */
+.stock-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
+.stock-title { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; }
+.stock-sub { font-size: 12px; color: var(--text-2); margin-top: 3px; }
+.stock-tiles { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+.stock-tile { background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; }
+.stock-tile.pending { border-style: dashed; border-color: var(--border-strong); }
+.stock-tile .l { font-size: 11px; font-weight: 600; letter-spacing: 0.5px; color: var(--text-2); text-transform: uppercase; }
+.stock-tile .v { font-size: 26px; font-weight: 700; margin-top: 4px; }
+.stock-tile.total .v { color: var(--teal); }
+.stock-tile.pending .v { color: var(--text-3); }
+.stock-tile .d { font-size: 12px; color: var(--text-2); margin-top: 2px; }
+.stock-card { background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow-x: auto; }
+.stock-grid { display: grid; column-gap: 8px; align-items: center; padding: 10px 18px; min-width: 860px; }
+.stock-grid.hd { background: var(--surface-2); font-size: 11px; font-weight: 600; letter-spacing: 0.4px; color: #d1d1d6; text-transform: uppercase; }
+.stock-grid.rw { border-top: 1px solid var(--border); font-size: 13px; }
+.stock-grid.ft { border-top: 1px solid var(--border-strong); background: rgba(255,255,255,0.03); font-weight: 700; font-size: 13px; }
+.stock-grid .num { text-align: right; }
+.stock-grid .mut { color: var(--text-3); }
+.stock-grid .dim { color: var(--text-2); }
+.cov { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.cov.low { background: rgba(255,159,10,0.18); color: #ffb340; }
+.cov.ok { background: rgba(48,209,88,0.16); color: #4fe07a; }
+.cov.high { background: rgba(64,156,255,0.18); color: #6cb2ff; }
+.cov.none { background: rgba(255,255,255,0.08); color: var(--text-2); }
+.stock-note { font-size: 11px; color: var(--text-2); line-height: 1.5; margin-top: 12px; }
+.stock-empty { padding: 28px; text-align: center; color: var(--text-2); font-size: 13px; }
+@media (max-width: 900px) { .stock-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .detail-retailer { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; color: var(--text); }
 .status-tiles { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
 .stile { display: flex; flex-direction: column; align-items: center; min-width: 76px; padding: 6px 12px; border-radius: 10px; border: 1px solid var(--border-strong); background: var(--surface-1); color: var(--text-2); font: inherit; cursor: pointer; }
@@ -587,6 +615,12 @@ body {
       </span>
       Detail Table
     </button>
+    <button class="nav-tab" onclick="switchView('stock',this)">
+      <span class="nav-badge" style="background:var(--teal)">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8l-9-5-9 5v8l9 5 9-5z"/><path d="M3 8l9 5 9-5"/><path d="M12 13v8"/></svg>
+      </span>
+      Stock On Hand
+    </button>
   </nav>
   <div id="syncStatus" style="margin-left:auto;min-width:44px;font-size:11px;font-weight:600;text-align:right;color:var(--text-3)"></div>
 </div>
@@ -602,7 +636,7 @@ body {
   <div class="tb-section" id="wkRangeCtrl">
     <div class="tb-title">Filters</div>
     <div class="tb-body">
-      <div class="tb-group">
+      <div class="tb-group" id="quarterGroup">
         <span class="wk-label">Quarter</span>
         <div id="quarterBtns" style="display:flex;gap:4px">
           <button class="qtr-btn" onclick="setQuarter(1)">Q1</button>
@@ -612,12 +646,16 @@ body {
           <button class="qtr-btn" onclick="setQuarter(0)">All</button>
         </div>
       </div>
-      <div class="toolbar-sep"></div>
-      <div class="tb-group">
+      <div class="toolbar-sep" id="qSep"></div>
+      <div class="tb-group" id="rangeGroup">
         <span class="wk-label">From</span>
         <select class="wk-sel" id="wkFrom" style="min-width:110px"></select>
         <span class="wk-label">To</span>
         <select class="wk-sel" id="wkTo" style="min-width:110px"></select>
+      </div>
+      <div class="tb-group" id="stockWeekGroup" style="display:none">
+        <span class="wk-label">Stock Week</span>
+        <select class="wk-sel" id="stockWeekSel" style="min-width:150px" onchange="setStockWeek(this.value)"></select>
       </div>
       <div class="toolbar-sep" id="brandTypeSep"></div>
       <div class="tb-group" id="brandTypeGroup">
@@ -739,6 +777,9 @@ body {
     </div>
     <div id="detailSections" style="display:flex;flex-direction:column;gap:12px;margin-top:12px"></div>
   </div>
+
+  <!-- ── STOCK ON HAND ── -->
+  <div id="stockView" style="display:none"></div>
 
 </div>
 
@@ -910,6 +951,7 @@ async function loadFromSupabase(){
     // Apply to EDIT
     Object.keys(EDIT).forEach(k => delete EDIT[k]);
     Object.assign(EDIT, newEdit);
+    await loadStock();
 
     // Keep RETAILERS in sync with whatever retailers actually exist in Supabase -
     // it must never stay frozen at the initial fallback dataset's retailer list,
@@ -1277,6 +1319,7 @@ function setArchived(retailer, secName, pIdx, flag){
 // The Products picker works on both tabs: Detail Table rows or the Overview "Sales by Product" chart
 function refreshProductView(){
   if(currentView==='detail') renderDetail();
+  else if(currentView==='stock') renderStock();
   else { syncDetailExtraFilters(); renderTypeChart(); }
 }
 // names offered in the Products picker: whatever the Brand and Type filters leave, plus anything already ticked
@@ -1422,6 +1465,7 @@ function switchView(v,btn){
   document.querySelectorAll('.nav-tab').forEach(t=>{t.classList.remove('active');t.removeAttribute('aria-current');});btn.classList.add('active');btn.setAttribute('aria-current','page');
   document.getElementById('overviewView').style.display=v==='overview'?'block':'none';
   document.getElementById('detailView').style.display=v==='detail'?'block':'none';
+  document.getElementById('stockView').style.display=v==='stock'?'block':'none';
   // Quarter, week range, Brand and Type apply to both views
   document.getElementById('wkRangeCtrl').style.display='flex';
   document.getElementById('brandTypeGroup').style.display='flex';
@@ -1431,6 +1475,14 @@ function switchView(v,btn){
   }
   // Status and the Products picker work on both tabs; Archived only applies to the Detail Table
   ['archiveFilterLabel','archiveFilterSel'].forEach(id=>{ const e=document.getElementById(id); if(e) e.style.display = v==='detail' ? '' : 'none'; });
+  // Stock On Hand has its own week picker: the Quarter and From/To controls do not apply
+  ['quarterGroup','qSep','rangeGroup'].forEach(id=>{ const e=document.getElementById(id); if(e) e.style.display = v==='stock' ? 'none' : ''; });
+  const sg = document.getElementById('stockWeekGroup'); if(sg) sg.style.display = v==='stock' ? 'flex' : 'none';
+  if(v==='stock' && activeRetailer!=='All' && !STOCK_RETAILERS.includes(activeRetailer)){
+    activeRetailer='All';
+    document.querySelectorAll('#retailerTabs .pill').forEach(t=>t.classList.toggle('active', t.textContent==='All'));
+  }
+  applyStockPillVisibility();
   setProductMultiOpen(false);
   applyDetailWeekFilter();
   renderAll();
@@ -1741,13 +1793,13 @@ function setActiveBrand(b){
   const pLbl=document.getElementById('productFilterLabel');
   if(pSel) pSel.style.display='none';
   if(pLbl) pLbl.style.display='none';
-  if(currentView==='detail') renderDetail(); else renderTypeChart();
+  if(currentView==='detail') renderDetail(); else if(currentView==='stock') renderStock(); else renderTypeChart();
 }
 function setActiveType(t){
   activeType=t; activeSeries='ALL'; activeProduct='ALL';
   const sel=document.getElementById('typeFilterSel');
   if(sel) sel.value=t;
-  if(currentView==='detail') renderDetail(); else renderTypeChart();
+  if(currentView==='detail') renderDetail(); else if(currentView==='stock') renderStock(); else renderTypeChart();
 }
 
 /* ── sparklines ── */
@@ -2435,9 +2487,129 @@ function renderDetail(){
 function renderAll(){
   if(currentView==='overview'){
     renderKpis();renderTrend();renderPills();renderProducts();renderTypeChart();renderSparks();renderWoW();renderTop5();renderSlowMovers();
+  } else if(currentView==='stock'){
+    renderStock();
   } else {
     renderDetail();
   }
+}
+
+/* ── Stock On Hand tab ── */
+// Retailers that report stock on hand; units come from each retailer's weekly report (weekly_stock table)
+const STOCK_RETAILERS = ['Bunnings AU','Bunnings NZ','Bing Lee','Harvey Norman'];
+const COVER_LOW = 6, COVER_HIGH = 26;       // weeks of cover: under 6 is Low, over 26 is High
+const STOCK = { byProduct: {}, weeks: [] }; // byProduct[product_id][week_label] = units on hand
+let stockWeek = null;
+
+function stEsc(s){ return String(s).replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch])); }
+function stNum(n){ return Number(n).toLocaleString('en-AU'); }
+
+async function loadStock(){
+  try {
+    let rows = [], from = 0;
+    while(true){
+      const { data, error } = await sb.from('weekly_stock').select('product_id,week_label,qty').range(from, from+999);
+      if(error || !data || !data.length) break;
+      rows = rows.concat(data);
+      if(data.length < 1000) break;
+      from += 1000;
+    }
+    STOCK.byProduct = {};
+    const seen = new Set();
+    rows.forEach(r => { (STOCK.byProduct[r.product_id] = STOCK.byProduct[r.product_id] || {})[r.week_label] = r.qty; seen.add(r.week_label); });
+    STOCK.weeks = [...seen].filter(w => WEEKS.includes(w)).sort((a,b) => WEEKS.indexOf(a) - WEEKS.indexOf(b));
+  } catch(e){ STOCK.byProduct = {}; STOCK.weeks = []; }
+}
+
+function setStockWeek(w){ stockWeek = w; renderStock(); }
+
+function applyStockPillVisibility(){
+  const stock = currentView==='stock';
+  document.querySelectorAll('#retailerTabs .pill').forEach(pl => { pl.style.display = (!stock || pl.textContent==='All' || STOCK_RETAILERS.includes(pl.textContent)) ? '' : 'none'; });
+}
+
+// units on hand per product for one stock week, honouring the retailer pill and the Brand, Type, Status and Products filters
+function computeStock(w){
+  const out = { rows: {}, totals: {}, reporting: {} };
+  if(!w) return out;
+  const wi = WEEKS.indexOf(w);
+  const lo = Math.max(0, wi-3), nWeeks = wi - lo + 1;
+  const scope = activeRetailer==='All' ? STOCK_RETAILERS : STOCK_RETAILERS.filter(r => r===activeRetailer);
+  STOCK_RETAILERS.forEach(r => {
+    const rd = EDIT[r];
+    out.reporting[r] = !!rd && Object.values(rd.sections).some(sec => sec.products.some(p => STOCK.byProduct[p.id] && STOCK.byProduct[p.id][w] !== undefined));
+    out.totals[r] = 0;
+  });
+  scope.forEach(r => {
+    if(!out.reporting[r]) return;
+    Object.entries(EDIT[r].sections).forEach(([sn, sec]) => sec.products.forEach(p => {
+      if(p.archived || !brandMatches(sn) || !filtersOk(p)) return;
+      const qty = (STOCK.byProduct[p.id] && STOCK.byProduct[p.id][w]) || 0;
+      const sold = Math.max(0, p.weekly.slice(lo, wi+1).reduce((a,b) => a+b, 0)) / nWeeks;   // average weekly sell-out, last 4 weeks
+      const row = out.rows[p.name] || (out.rows[p.name] = { name: p.name, type: p.type || '', soh: {}, rate: 0 });
+      row.soh[r] = (row.soh[r] || 0) + qty;
+      row.rate += sold;
+      out.totals[r] += qty;
+    }));
+  });
+  return out;
+}
+
+function renderStock(){
+  const box = document.getElementById('stockView');
+  if(!box) return;
+  syncDetailFilterOptions(); syncDetailExtraFilters(); applyStockPillVisibility();
+  const weeks = STOCK.weeks;
+  if(!stockWeek || !weeks.includes(stockWeek)) stockWeek = weeks.length ? weeks[weeks.length-1] : null;
+  const sel = document.getElementById('stockWeekSel');
+  if(sel){
+    sel.innerHTML = weeks.length
+      ? weeks.slice().reverse().map(w => { const h = WEEK_HEADERS[WEEKS.indexOf(w)]; return '<option value="' + w + '"' + (w===stockWeek ? ' selected' : '') + '>' + w + ' ' + (h ? h.date : '') + '</option>'; }).join('')
+      : '<option>No stock data</option>';
+  }
+  if(!stockWeek){
+    box.innerHTML = '<div class="stock-head"><div><div class="stock-title">Stock On Hand</div></div></div><div class="stock-card"><div class="stock-empty">No stock on hand data has been loaded yet.</div></div>';
+    return;
+  }
+  const wh = WEEK_HEADERS[WEEKS.indexOf(stockWeek)];
+  const wIdx = weeks.indexOf(stockWeek);
+  const prevW = wIdx > 0 ? weeks[wIdx-1] : null;
+  const cur = computeStock(stockWeek), prev = prevW ? computeStock(prevW) : null;
+  const scope = activeRetailer==='All' ? STOCK_RETAILERS : STOCK_RETAILERS.filter(r => r===activeRetailer);
+  const scopeTotal = scope.reduce((s, r) => s + (cur.reporting[r] ? cur.totals[r] : 0), 0);
+  const delta = (now, before, had) => {
+    if(!prev) return 'First week of stock data';
+    if(!had) return 'New this week';
+    const d = now - before;
+    return (d > 0 ? '+' : d < 0 ? '\u2212' : '') + stNum(Math.abs(d)) + ' vs ' + prevW;
+  };
+  const prevScopeTotal = prev ? scope.reduce((s, r) => s + (prev.reporting[r] ? prev.totals[r] : 0), 0) : 0;
+  const reportingCount = STOCK_RETAILERS.filter(r => cur.reporting[r]).length;
+  let tiles = '<div class="stock-tile total"><div class="l">Total On Hand</div><div class="v">' + stNum(scopeTotal) + '</div><div class="d">' + (prev ? delta(scopeTotal, prevScopeTotal, true) : reportingCount + ' of ' + STOCK_RETAILERS.length + ' retailers reporting') + '</div></div>';
+  STOCK_RETAILERS.forEach(r => {
+    if(cur.reporting[r]) tiles += '<div class="stock-tile"><div class="l">' + stEsc(r) + '</div><div class="v">' + stNum(cur.totals[r]) + '</div><div class="d">' + delta(cur.totals[r], prev ? prev.totals[r] : 0, prev ? prev.reporting[r] : false) + '</div></div>';
+    else tiles += '<div class="stock-tile pending"><div class="l">' + stEsc(r) + '</div><div class="v">\u2014</div><div class="d">No stock report yet</div></div>';
+  });
+  const cols = activeRetailer==='All' ? STOCK_RETAILERS : scope;
+  const tpl = 'grid-template-columns:minmax(0,2fr) minmax(0,0.9fr) repeat(' + cols.length + ',minmax(0,1fr)) minmax(0,0.9fr) minmax(0,0.9fr) minmax(0,1.4fr)';
+  const rows = Object.values(cur.rows).map(r => { r.total = Object.values(r.soh).reduce((a,b) => a+b, 0); return r; }).filter(r => r.total > 0).sort((a,b) => b.total - a.total || a.name.localeCompare(b.name));
+  let html = '<div class="stock-head"><div><div class="stock-title">Stock On Hand</div><div class="stock-sub">Units held at the retailers, from their weekly reports. As of ' + stEsc(stockWeek) + (wh ? ' (' + stEsc(wh.date) + ')' : '') + '.</div></div></div>';
+  html += '<div class="stock-tiles">' + tiles + '</div>';
+  html += '<div class="stock-card">';
+  html += '<div class="stock-grid hd" style="' + tpl + '"><div>Product</div><div>Type</div>' + cols.map(r => '<div class="num">' + stEsc(r) + '</div>').join('') + '<div class="num">Total</div><div class="num">Sold / Week</div><div class="num">Weeks Of Cover</div></div>';
+  if(!rows.length) html += '<div class="stock-empty">No products with stock on hand match the current filters.</div>';
+  rows.forEach(r => {
+    const cover = r.rate > 0 ? Math.round(r.total / r.rate) : null;
+    const cls = cover === null ? 'none' : cover < COVER_LOW ? 'low' : cover > COVER_HIGH ? 'high' : 'ok';
+    const lbl = cover === null ? 'No sales' : stNum(cover) + ' wks \u00b7 ' + (cls === 'low' ? 'Low' : cls === 'high' ? 'High' : 'OK');
+    html += '<div class="stock-grid rw" style="' + tpl + '"><div style="font-weight:500">' + stEsc(r.name) + '</div><div class="dim" style="font-size:12px">' + stEsc(r.type) + '</div>'
+      + cols.map(c => (!cur.reporting[c] || r.soh[c] === undefined) ? '<div class="num mut">\u2014</div>' : '<div class="num">' + stNum(r.soh[c]) + '</div>').join('')
+      + '<div class="num" style="font-weight:700">' + stNum(r.total) + '</div><div class="num dim">' + r.rate.toFixed(1) + '</div><div class="num"><span class="cov ' + cls + '">' + lbl + '</span></div></div>';
+  });
+  html += '<div class="stock-grid ft" style="' + tpl + '"><div>Total</div><div></div>' + cols.map(c => cur.reporting[c] ? '<div class="num">' + stNum(cur.totals[c]) + '</div>' : '<div class="num mut" style="font-weight:400">\u2014</div>').join('') + '<div class="num" style="color:var(--teal)">' + stNum(scopeTotal) + '</div><div></div><div></div></div>';
+  html += '</div>';
+  html += '<div class="stock-note"><strong style="color:var(--text)">Weeks of cover</strong> = units on hand divided by the average weekly sell-out over the last 4 weeks. Flags: under ' + COVER_LOW + ' weeks Low, ' + COVER_LOW + ' to ' + COVER_HIGH + ' OK, over ' + COVER_HIGH + ' High. Archived products are left out, as on the other tabs.</div>';
+  box.innerHTML = html;
 }
 
 // Show loading overlay, load from Supabase, then render
